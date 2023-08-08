@@ -1,9 +1,11 @@
 #! /bin/bash
 
+sslPath='openssl'
+
 help_msg() {
 yellow='\033[0;93m'
 reset='\033[0m'
-echo -e "Usage:
+printf "\nUsage:
 script.sh <options>
 
 # Options marked in ${yellow}yellow${reset} are required
@@ -11,8 +13,11 @@ Options:
   ${yellow}[ -a ALGO ]${reset} Encryption algorithm
   ${yellow}[ -s HASH ]${reset} Password hash
   ${yellow}[ -i LO-HI ]${reset} Number range of password iterations
+       Append 's' before LO-HI for static iteration,
+       and replace LO-HI with a single NUMBER
   ${yellow}[ -c ROUNDS ]${reset} Number of encryption rounds
   ${yellow}[ -p LENGTH ]${reset} Length of generated passwords
+       Append 's' before LENGTH for static password
   [ -k PRIVKEY,PUBKEY ] Use ECDH shared secret as password
   [ -t asip ] Choose which parameters are static
        a: algorithm, s: hash
@@ -32,7 +37,8 @@ Options:
   
 Example:
 script.sh -a aes-256-cbc -s sha512 -i 1000-2000 -c 2 -p 64
-"
+script.sh -da123 -ds123 -i s5000 -c 2 -p s64
+\n"
 }
 
 if [[ -z $@ ]]; then
@@ -74,6 +80,7 @@ do case "$1" in
 			iterval="${is}-${is}"
 			unset is
 		else
+			dynIter=1
 			iterval="$2"
 		fi
 		shift 2
@@ -93,13 +100,13 @@ do case "$1" in
 			length="$2"
 		fi
 		if [[ length -gt 512 ]]; then
-			echo "Warning: OpenSSL can only accept password lengths up to 512"
+			printf '%s\n' "Warning: OpenSSL can only accept password lengths up to 512"
 			length=512
 		fi
 		shift 2
 	;;
 	'-k')
-		secret=$(openssl pkeyutl -derive -inkey "${2%,*}" -peerkey "${2##*,}" | base64 -w0)
+		secret=$($sslPath pkeyutl -derive -inkey "${2%,*}" -peerkey "${2##*,}" | $sslPath enc -base64 -A)
 		length=${#secret}
 		dynVals=( "${dynVals[@]/p}" )
 		statVals+=('p')
@@ -204,37 +211,39 @@ fi
 if [[ -z $genmode ]]; then
 	genmode='secure'
 fi
-if [[ mode -lt 4 ]]; then
-	genmode='fast'
+if [[ mode -gt 1 ]]; then
+	printNewline=( 'printf' '\n' )
+else
+	printOne=( 'printf' '\n' )
 fi
 if [[ -z $randomtype ]]; then
 	randomtype='/dev/urandom'
 fi
 
 gen-static() {
-echo -e "[Encryption Parameters File]\n0${rounds}"
+printf '%s\n' "[Cascade Encryption Parameters File]" "0${rounds}"
 for i in ${statVals[@]}; do
 	case "$i" in
 		'a')
-			echo "1${algo[ $((RANDOM % algoLength)) ]}"
+			printf '%s\n' "1${algo[ $((RANDOM % algoLength)) ]}"
 		;;
 		'h')
-			echo "2${hash[ $((RANDOM % hashLength)) ]}"
+			printf '%s\n' "2${hash[ $((RANDOM % hashLength)) ]}"
 		;;
 		'i')
-			echo "3$(shuf -n 1 -i $iterval)"
+			printf '%s\n' "3$(shuf -n 1 -i $iterval)"
 		;;
 		'p')
 			if [[ -z $secret ]]; then
-				echo "4$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)"
+				printf '%s\n' "4$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)"
 			else
-				echo "4$secret"
+				printf '%s\n' "4$secret"
 			fi
 		;;
 	esac
 done
 unset statVals
-echo "============================"
+printf '%s' "===================================="
 }
 
 generate-file() {
@@ -243,24 +252,29 @@ gen-static
 
 if [[ $genmode == 'secure' ]]; then
 	for (( i = 0; i < rounds; i ++ )); do
-		pass=$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)
-		iter=$(shuf -n 1 -i $iterval)
+		if [[ dynPass -eq 1 ]]; then
+			pass=$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)
+		fi
+		if [[ dynIter -eq 1 ]]; then
+			iter=$(shuf -n 1 -i $iterval)
+		fi
 		for j in ${dynVals[@]}; do
 			case "$j" in
 				'a')
-					echo "1${algo[ $((RANDOM % algoLength)) ]}"
+					printf '\n%s' "1${algo[ $((RANDOM % algoLength)) ]}"
 				;;
 				'h')
-					echo "2${hash[ $((RANDOM % hashLength)) ]}"
+					printf '\n%s' "2${hash[ $((RANDOM % hashLength)) ]}"
 				;;
 				'i')
-					echo "3${iter}"
+					printf '\n%s' "3${iter}"
 				;;
 				'p')
-					echo "4${pass}"
+					printf '\n%s' "4${pass}"
 				;;
 			esac
 		done
+		${printNewline[@]}
 	done
 elif [[ $genmode == 'fast' ]]; then
 		if [[ rounds -gt 10000 ]]; then
@@ -283,7 +297,9 @@ elif [[ $genmode == 'fast' ]]; then
 			subruns="$remainder"
 		fi
 		
-		iter=( $(shuf -r -n $subruns -i $iterval) )
+		if [[ dynIter -eq 1 ]]; then
+			iter=( $(shuf -r -n $subruns -i $iterval) )
+		fi
 
 		if [[ dynPass -eq 1 ]]; then
 			pass=( $(cat $randomtype | tr -dc '[:graph:]' | head -c $(( length * subruns )) | fold -w $length) )
@@ -293,22 +309,24 @@ elif [[ $genmode == 'fast' ]]; then
 			for j in ${dynVals[@]}; do
 				case "$j" in
 					'a')
-						echo "1${algo[ $((RANDOM % algoLength)) ]}"
+						printf '\n%s' "1${algo[ $((RANDOM % algoLength)) ]}"
 					;;
 					'h')
-						echo "2${hash[ $((RANDOM % hashLength)) ]}"
+						printf '\n%s' "2${hash[ $((RANDOM % hashLength)) ]}"
 					;;
 					'i')
-						echo "3${iter[ $i ]}"
+						printf '\n%s' "3${iter[ $i ]}"
 					;;
 					'p')
-						echo "4${pass[ $i ]}"
+						printf '\n%s' "4${pass[ $i ]}"
 					;;
 				esac
 			done
+			${printNewline[@]}
 		done
 	done
 fi
+${printOne[@]}
 
 }
 

@@ -57,18 +57,18 @@ PASSWORD2
 
 ## Example:
 
-[Encryption Parameters File v4]
-2
+[Encryption Parameters File]
+02
+============================
+1aes-256-cbc
+2sha512
+310000
+4Password1
 
-aes-256-cbc
-sha512
-10000
-Password1
-
-aes-256-cbc
-sha512
-20000
-Password2
+1aes-256-cbc
+2sha512
+320000
+4Password2
 
 
 ## Usage Examples:
@@ -154,7 +154,7 @@ do case "$1" in
 			printf "'-k' cannot be used with '-p'. Exiting.\n"
 			exit
 		fi
-		pass=$($sslPath pkeyutl -derive -inkey "${2%,*}" -peerkey "${2##*,}" | base64 -w0)
+		pass=$($sslPath pkeyutl -derive -inkey "${2%,*}" -peerkey "${2##*,}" | $sslPath enc -base64 -A)
 		shift 2
 	;;
 	'-f')
@@ -372,15 +372,15 @@ pasf-sed() {
 			endLine=$startLine
 		;;
 		'2')
-			startLine=$(( (2 * n) + 6 ))
+			startLine=$(( (3 * n) + 6 ))
 			endLine=$(( startLine + 1 ))
 		;;
 		'3')
-			startLine=$(( (3 * n) + 5 ))
+			startLine=$(( (4 * n) + 5 ))
 			endLine=$(( startLine + 2 ))
 		;;
 		'4')
-			startLine=$(( (4 * n) + 4 ))
+			startLine=$(( (5 * n) + 4 ))
 			endLine=$(( startLine + 3 ))
 		;;
 	esac
@@ -754,7 +754,7 @@ else
 	# https://stackoverflow.com/questions/6022384/bash-tool-to-get-nth-line-from-a-file
 	pchk=$(sed '1q;d' "$pasf")
 
-	if ! [[ "$pchk" == '[Encryption Parameters File]' ]]; then
+	if ! [[ "$pchk" == '[Cascade Encryption Parameters File]' ]]; then
 		printf "Error: first line of file must be '[Encryption Parameters File]'. Aborting.\n"
 		exit
 	fi
@@ -798,19 +798,19 @@ else
 			;;
 			'1')
 				startLine=7
-				endLine=$(( (loop * 1) + startLine ))
+				endLine=$(( loop + startLine ))
 			;;
 			'2')
 				startLine=6
-				endLine=$(( (loop * 2) + startLine ))
+				endLine=$(( (loop * 3) + startLine ))
 			;;
 			'3')
 				startLine=5
-				endLine=$(( (loop * 3) + startLine ))
+				endLine=$(( (loop * 4) + startLine ))
 			;;
 			'4')
 				startLine=4
-				endLine=$(( (loop * 4) + startLine ))
+				endLine=$(( (loop * 5) + startLine ))
 			;;
 		esac
 		pchoice='pasf-ram'
