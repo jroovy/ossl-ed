@@ -6,7 +6,7 @@ help_msg() {
 yellow='\033[0;93m'
 reset='\033[0m'
 printf "\nUsage:
-script.sh <options>
+$0 <options>
 
 # Options marked in ${yellow}yellow${reset} are required
 Options:

@@ -5,7 +5,7 @@ tmpDir='/tmp'
 
 help_msg() {
 printf "
-script.sh <options> file1 folder2 file3 ...
+$0 <options> file1 folder2 file3 ...
 Options:
   [ -e ] Encrypt file(s)
   [ -d ] Decrypt file(s)
