@@ -57,9 +57,9 @@ PASSWORD2
 
 ## Example:
 
-[Encryption Parameters File]
+[Cascade Encryption Parameters File]
 02
-============================
+====================================
 1aes-256-cbc
 2sha512
 310000
