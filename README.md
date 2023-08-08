@@ -16,3 +16,6 @@ Cascading is encrypting a file multiple times to increase security.
 is used for generating ECDH private-public key pairs.
 
 Key pairs are used for sharing passwords securely through insecure channels.
+
+## Usage instructions
+coming soon...
