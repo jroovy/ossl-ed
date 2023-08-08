@@ -18,4 +18,6 @@ is used for generating ECDH private-public key pairs.
 Key pairs are used for sharing passwords securely through insecure channels.
 
 ## Usage instructions
-coming soon...
+Usage instructions/examples are included within the script.
+
+Simply run any script with `-h` to access them.
