@@ -40,26 +40,26 @@ printf "
 ## Parameter file:
 
 The file should be in the following format:
-# Encryption Rounds
-NUM
+[Cascade Encryption Parameters]
+0NUM
+===============================
+1ALGORITHM
+2HASH
+3ITERATIONS
+4PASSWORD
 
-ALGORITHM1
-HASH1
-ITERATIONS1
-PASSWORD1
-
-ALGORITHM2
-HASH2
-ITERATIONS2
-PASSWORD2
+1ALGORITHM
+2HASH
+3ITERATIONS
+4PASSWORD
 
 ...etc
 
 ## Example:
 
-[Cascade Encryption Parameters File]
+[Cascade Encryption Parameters]
 02
-====================================
+===============================
 1aes-256-cbc
 2sha512
 310000
@@ -754,8 +754,8 @@ else
 	# https://stackoverflow.com/questions/6022384/bash-tool-to-get-nth-line-from-a-file
 	pchk=$(sed '1q;d' "$pasf")
 
-	if ! [[ "$pchk" == '[Cascade Encryption Parameters File]' ]]; then
-		printf "Error: first line of file must be '[Cascade Encryption Parameters File]'. Aborting.\n"
+	if ! [[ "$pchk" == '[Cascade Encryption Parameters]' ]]; then
+		printf "Error: first line of file must be '[Cascade Encryption Parameters]'. Aborting.\n"
 		exit
 	fi
 	

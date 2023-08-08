@@ -221,7 +221,7 @@ if [[ -z $randomtype ]]; then
 fi
 
 gen-static() {
-printf '%s\n' "[Cascade Encryption Parameters File]" "0${rounds}"
+printf '%s\n' "[Cascade Encryption Parameters]" "0${rounds}"
 for i in ${statVals[@]}; do
 	case "$i" in
 		'a')
@@ -243,7 +243,7 @@ for i in ${statVals[@]}; do
 	esac
 done
 unset statVals
-printf '%s' "===================================="
+printf '%s' "==============================="
 }
 
 generate-file() {
