@@ -755,7 +755,7 @@ else
 	pchk=$(sed '1q;d' "$pasf")
 
 	if ! [[ "$pchk" == '[Cascade Encryption Parameters File]' ]]; then
-		printf "Error: first line of file must be '[Encryption Parameters File]'. Aborting.\n"
+		printf "Error: first line of file must be '[Cascade Encryption Parameters File]'. Aborting.\n"
 		exit
 	fi
 	
