@@ -17,6 +17,11 @@ is used for generating ECDH private-public key pairs.
 
 Key pairs are used for sharing passwords securely through insecure channels.
 
+## Customizable variables
+You can customize some variables in **ossl-ed.sh** and **ossl-gen.sh**
+
+These variables are located right under **#! /bin/bash** of the scripts
+
 ## Usage instructions
 Usage instructions/examples are included within the scripts.
 
