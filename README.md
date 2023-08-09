@@ -20,7 +20,7 @@ Key pairs are used for sharing passwords securely through insecure channels.
 ## Customizable variables
 You can customize some variables in **ossl-ed.sh** and **ossl-gen.sh**
 
-These variables are located right under **#! /bin/bash** of the scripts
+These variables are located between **#! /bin/bash** and **help_msg()**
 
 ## Usage instructions
 Usage instructions/examples are included within the scripts.
