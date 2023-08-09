@@ -32,7 +32,7 @@ Options:
            4 = WHIRLPOOL
   [ -m NUM ] Define output format (1-4, default 4)
   [ -o FILE ] Location to save output
-  [ -n NAME ] Save output file to $centralPassDir
+  [ -n NAME ] Save output file to $centralPassDir (overrides -o)
               NAME should not include extension
   [ -f ] Generate faster, but less secure passwords
   [ -r ] Use /dev/random instead of /dev/urandom
