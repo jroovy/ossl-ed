@@ -1,6 +1,7 @@
 #! /bin/bash
 
 sslPath='openssl'
+centralPassDir="${HOME}/.config/ossl-ed"
 
 help_msg() {
 yellow='\033[0;93m'
@@ -31,13 +32,15 @@ Options:
            4 = WHIRLPOOL
   [ -m NUM ] Define output format (1-4, default 4)
   [ -o FILE ] Location to save output
+  [ -n NAME ] Save output file to $centralPassDir
+              NAME should not include extension
   [ -f ] Generate faster, but less secure passwords
   [ -r ] Use /dev/random instead of /dev/urandom
   [ -h ] Show this help
   
 Example:
-script.sh -a aes-256-cbc -s sha512 -i 1000-2000 -c 2 -p 64
-script.sh -da123 -ds123 -i s5000 -c 2 -p s64
+$0 -a aes-256-cbc -s sha512 -i 1000-2000 -c 2 -p 64
+$0 -da123 -ds123 -i s5000 -c 2 -p s64
 \n"
 }
 
@@ -49,7 +52,7 @@ fi
 mode=4
 dynVals=( 'a' 'h' 'i' 'p' )
 
-ARGS=$(getopt -n openssl-multigen -o a:s:i:c:p:k:d:m:o:frh -- "$@")
+ARGS=$(getopt -n openssl-multigen -o a:s:i:c:p:k:d:m:o:n:frh -- "$@")
 eval set -- "$ARGS"
 
 while :
@@ -168,6 +171,13 @@ do case "$1" in
 	;;
 	'-o')
 		output="$2"
+		shift 2
+	;;
+	'-n')
+		output="${centralPassDir}/${2}.txt"
+		if ! [[ -d "$centralPassDir" ]]; then
+			mkdir -p "$centralPassDir"
+		fi
 		shift 2
 	;;
 	'-f')
