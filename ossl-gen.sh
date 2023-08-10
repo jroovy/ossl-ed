@@ -172,6 +172,14 @@ do case "$1" in
 		output="${centralPassDir}/${2}.txt"
 		if ! [[ -d "$centralPassDir" ]]; then
 			mkdir -p "$centralPassDir"
+		elif [[ -f "$output" ]]; then
+			printf "'$output' already exists, replace? (y/n) "
+			read a
+			if ! [[ $a == [Yy] ]]; then
+				printf 'Exiting.\n'
+				exit
+			fi
+			unset a
 		fi
 		shift 2
 	;;
