@@ -30,7 +30,6 @@ Options:
            4 = CHACHA20
         s: 1 = SHA512, 2 = BLAKE2B-512, 3 = SHA3-512,
            4 = WHIRLPOOL
-  [ -m NUM ] Define output format (1-4, default 4)
   [ -o FILE ] Location to save output
   [ -n NAME ] Save output file to $centralPassDir (overrides -o)
               NAME should not include extension
@@ -52,7 +51,7 @@ fi
 mode=4
 dynVals=( 'a' 'h' 'i' 'p' )
 
-ARGS=$(getopt -n openssl-multigen -o a:s:i:c:p:k:d:m:o:n:frh -- "$@")
+ARGS=$(getopt -n openssl-multigen -o a:s:i:c:p:k:d:o:n:frh -- "$@")
 eval set -- "$ARGS"
 
 while :
@@ -163,10 +162,6 @@ do case "$1" in
 				hashLength=${#hash[@]}
 			done
 		fi
-		shift 2
-	;;
-	'-m')
-		mode="$2"
 		shift 2
 	;;
 	'-o')
