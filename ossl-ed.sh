@@ -32,6 +32,7 @@ Options:
      Some algorithms can go beyond 9 (eg. zstd)
   [ -o DIR ] Set output directory to DIR
              Set output to FILE if using -t
+             When using -t, FILE should not include extension
   [ -j ] Show usage examples
   [ -h ] Show this help message
   
@@ -847,7 +848,7 @@ if [[ -z $out ]]; then
 		done
 		out='./'
 	else
-		printf "Error: tar archive name not defined. Exiting.\n"
+		printf '%s\n' "Error: tar archive name not defined. Exiting." "Define name with -o (see -h)"
 		exit 1
 	fi
 elif [[ -z $usetar ]]; then
