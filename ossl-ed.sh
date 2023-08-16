@@ -846,7 +846,6 @@ if [[ -z $out ]]; then
 		| while read -r i; do
 			mkdir -p "${out}/${i}"
 		done
-		out='./'
 	else
 		printf '%s\n' "Error: tar archive name not defined. Exiting." "Define name with -o (see -h)"
 		exit 1
