@@ -171,6 +171,10 @@ do case "$1" in
 	;;
 	'-F')
 		pasf="${centralPassDir}/${2}.txt"
+		if [[ "$2" == *'/'* ]]; then
+			printf '%s\n' "Trying to specify directory to params file." "Use '-f' instead." "Aborting."
+			exit
+		fi
 		if ! [[ -d "$centralPassDir" ]]; then
 			mkdir -p "$centralPassDir"
 		elif ! [[ -f "$pasf" ]]; then
