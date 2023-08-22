@@ -850,13 +850,11 @@ if [[ -z $out ]]; then
 		| while read -r i; do
 			mkdir -p "${out}/${i}"
 		done
+	elif [[ $operation == 'e' ]]; then
+		printf '%s\n' "Error: tar archive name not defined. Exiting." "Define name with -o (see -h)"
+		exit 1
 	else
-		if [[ $operation == 'e' ]]; then
-			printf '%s\n' "Error: tar archive name not defined. Exiting." "Define name with -o (see -h)"
-			exit 1
-		else
-			out='./'
-		fi
+		out='./'
 	fi
 elif [[ -z $usetar ]]; then
 	mkdir -p "$out"
