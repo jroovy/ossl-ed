@@ -6,25 +6,26 @@ centralPassDir="${HOME}/.config/ossl-ed"
 
 help_msg() {
 printf "
-$0 <options> file1 folder2 file3 ...
+$0 <options> file(s) folder(s) ...
 Options:
   [ -e ] Encrypt file(s)
   [ -d ] Decrypt file(s)
   [ -r .EXT ] Only process file(s) with extension .EXT (can be used multiple times)
   [ -b ] Encode output file in Base64
-  [ -g ] Process file in $tmpDir instead of RAM
+  [ -g ] Process file in $tmpDir instead of pipes
   [ -p PASS ] Password for encryption/decryption
   [ -k PRIVKEY,PUBKEY ] Derive password from an ECDH key pair
+  [ -k PRIVKEY] Derive a password from your own private key (self encryption)
   [ -f PARAMFILE ] File containing parameters (see -j)
   [ -F PARAM_NAME ] Read parameter file stored in $centralPassDir (overrides -f)
-                    PARAM_NAME should not include extension
+                    PARAM_NAME should not include file extension
   [ -a ALGO ] Encryption algorithm to use
   [ -s HASH ] Hash algorithm to use
   [ -i NUM ] Pasword hash iteration
   [ -t ] Compress file(s) into tar archive
   [ -z ] Extract tar archives into separate folders
   [ -c COMPRESSION ] Compress file(s)
-       bzip2, bzip3, gzip, lz4
+       bzip2, gzip, lz4
        lzop, xz, zstd
   [ -mN ] Set compression level to N number
      -m0: fastest, no compression
@@ -113,7 +114,7 @@ eval set -- "$ARGS"
 while :
 do case "$1" in
 	'-e')
-		if ! [[ -z $operation ]]; then
+		if [[ -n $operation ]]; then
 			printf "Error: -d cannot be used with -e. Exiting.\n"
 			exit
 		fi
@@ -121,7 +122,7 @@ do case "$1" in
 		shift
 	;;
 	'-d')
-		if ! [[ -z $operation ]]; then
+		if [[ -n $operation ]]; then
 			printf "Error: -e cannot be used with -d. Exiting.\n"
 			exit
 		fi
@@ -146,7 +147,7 @@ do case "$1" in
 		shift
 	;;
 	'-p')
-		if ! [[ -z $pass ]]; then
+		if [[ -n $pass ]]; then
 			printf "'-p' cannot be used with '-k'. Exiting.\n"
 			exit
 		fi
@@ -154,31 +155,40 @@ do case "$1" in
 		shift 2
 	;;
 	'-k')
-		if ! [[ -z $pass ]]; then
+		if [[ -n $pass ]]; then
 			printf "'-k' cannot be used with '-p'. Exiting.\n"
 			exit
 		fi
-		pass=$($sslPath pkeyutl -derive -inkey "${2%,*}" -peerkey "${2##*,}" | $sslPath enc -base64 -A)
+		if [[ "$2" == *','* ]]; then
+			pass=$($sslPath pkeyutl -derive -inkey "${2%,*}" -peerkey "${2##*,}" | $sslPath enc -base64 -A)
+		else
+			# https://stackoverflow.com/a/54926249
+			pass=$(\
+				$sslPath ec -in "$2" -pubout 2> /dev/null \
+				| $sslPath pkeyutl -derive -inkey "$2" -peerkey /dev/stdin \
+				| $sslPath enc -base64 -A \
+			)
+		fi
 		shift 2
 	;;
 	'-f')
-		pasf="$2"
-		if ! [[ -f "$pasf" ]]; then
-			printf "File '$pasf' not found. Aborting.\n"
+		passfile="$2"
+		if ! [[ -f "$passfile" ]]; then
+			printf "File '$passfile' not found. Aborting.\n"
 			exit
 		fi
 		shift 2
 	;;
 	'-F')
-		pasf="${centralPassDir}/${2}.txt"
+		passfile="${centralPassDir}/${2}.txt"
 		if [[ "$2" == *'/'* ]]; then
 			printf '%s\n' "Trying to specify directory to params file." "Use '-f' instead." "Aborting."
 			exit
 		fi
 		if ! [[ -d "$centralPassDir" ]]; then
 			mkdir -p "$centralPassDir"
-		elif ! [[ -f "$pasf" ]]; then
-			printf "Error: '${pasf}' does not exist. Aborting.\n"
+		elif ! [[ -f "$passfile" ]]; then
+			printf "Error: '${passfile}' does not exist. Aborting.\n"
 			exit
 		fi
 		shift 2
@@ -210,10 +220,10 @@ do case "$1" in
 				cmpext='bz2'
 				tarext='tbz2'
 			;;
-			'bz3' | 'bzip3')
-				cmpext='bz3'
-				tarext='tbz3'
-			;;
+			# 'bz3' | 'bzip3')
+			# 	cmpext='bz3'
+			# 	tarext='tbz3'
+			# ;;
 			'gz' | 'gzip')
 				cmpext='gz'
 				tarext='tgz'
@@ -322,7 +332,7 @@ gen-ossl-flags() {
 	osslArgs=( ${staticVals[@]} "-${algo}" "-md" "$hash" "-iter" "$iter" "-k" "$pass" )
 }
 
-pasf-assign-vars() {
+passfile-assign-vars() {
 	case "${i:0:1}" in
 		'1')
 			algo="${i:1}"
@@ -339,24 +349,24 @@ pasf-assign-vars() {
 	esac
 }
 
-pasf-get-params() {
+passfile-get-params() {
 	case "$pchoice" in
-		'pasf-ram')
+		'passfile-ram')
 			# https://askubuntu.com/a/705131
 			for i in ${datarray[@]:${startLine}:${endLine}}; do
-				pasf-assign-vars
+				passfile-assign-vars
 			done
 		;;
-		'pasf-sed')
+		'passfile-sed')
 			for i in ${datarray[@]}; do
-				pasf-assign-vars
+				passfile-assign-vars
 			done
 		;;
 	esac
 	gen-ossl-flags
 }
 
-pasf-ram() {
+passfile-ram() {
 	case "$filetype" in
 		'0')
 			startLine=0
@@ -379,11 +389,11 @@ pasf-ram() {
 			endLine=4
 		;;
 	esac
-	pasf-get-params
+	passfile-get-params
 	unset startLine endLine
 }
 
-pasf-sed() {
+passfile-sed() {
 	case "$filetype" in
 		'0')
 			startLine=2
@@ -406,8 +416,8 @@ pasf-sed() {
 			endLine=$(( startLine + 3 ))
 		;;
 	esac
-	datarray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$pasf") )
-	pasf-get-params
+	datarray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$passfile") )
+	passfile-get-params
 	unset startLine endLine datarray
 }
 
@@ -523,17 +533,17 @@ data-compress() {
 			--stdout \
 			$complvl
 		;;
-		'bz3' | 'bzip3')
-			if [[ -z $complvl ]]; then
-				complvl='-16'
-			fi
-			bzip3 \
-			--encode \
-			--keep \
-			--stdout \
-			--jobs=${threads} \
-			--block=${complvl:1}
-		;;
+		# 'bz3' | 'bzip3')
+		# 	if [[ -z $complvl ]]; then
+		# 		complvl='-16'
+		# 	fi
+		# 	bzip3 \
+		# 	--encode \
+		# 	--keep \
+		# 	--stdout \
+		# 	--jobs=${threads} \
+		# 	--block=${complvl:1}
+		# ;;
 		'gz' | 'gzip')
 			gzip \
 			--quiet \
@@ -586,13 +596,13 @@ data-decompress() {
 			--keep \
 			--stdout
 		;;
-		*'bz3'*)
-			bzip3 \
-			--decode \
-			--keep \
-			--stdout \
-			--jobs=${threads}
-		;;
+		# *'bz3'*)
+		# 	bzip3 \
+		# 	--decode \
+		# 	--keep \
+		# 	--stdout \
+		# 	--jobs=${threads}
+		# ;;
 		*'gz'*)
 			gzip \
 			--quiet \
@@ -749,7 +759,7 @@ if [[ -z $opstyle ]]; then
 	opstyle='inram'
 fi
 
-if [[ -z $pasf ]]; then
+if [[ -z $passfile ]]; then
 	if [[ -z $pass ]]; then
 		printf 'Using blank password, are you sure? (y/n) '
 		read a
@@ -774,7 +784,7 @@ if [[ -z $pasf ]]; then
 	unset pchoice
 else
 	# https://stackoverflow.com/questions/6022384/bash-tool-to-get-nth-line-from-a-file
-	pchk=$(sed '1q;d' "$pasf")
+	pchk=$(sed '1q;d' "$passfile")
 
 	if ! [[ "$pchk" == '[Cascade Encryption Parameters]' ]]; then
 		printf "Error: first line of file must be '[Cascade Encryption Parameters]'. Aborting.\n"
@@ -782,7 +792,7 @@ else
 	fi
 	
 	filetype=4
-	cval=( $(sed -n "2,6p;6q" "$pasf") )
+	cval=( $(sed -n "2,6p;6q" "$passfile") )
 	for i in ${cval[@]}; do
 		case "${i:0:1}" in
 			'0')
@@ -811,7 +821,7 @@ else
 	done
 	
 	if [[ loop -gt 1000 ]]; then
-		pchoice='pasf-sed'
+		pchoice='passfile-sed'
 	else
 		case "$filetype" in
 			'0')
@@ -835,8 +845,8 @@ else
 				endLine=$(( (loop * 5) + startLine ))
 			;;
 		esac
-		pchoice='pasf-ram'
-		datarray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$pasf") )
+		pchoice='passfile-ram'
+		datarray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$passfile") )
 	fi
 	
 	unset i cval pchk
