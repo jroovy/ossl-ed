@@ -159,16 +159,25 @@ do case "$1" in
 			printf "'-k' cannot be used with '-p'. Exiting.\n"
 			exit
 		fi
-		if [[ "$2" == *','* ]]; then
-			pass=$($sslPath pkeyutl -derive -inkey "${2%,*}" -peerkey "${2##*,}" | $sslPath enc -base64 -A)
+
+		# https://unix.stackexchange.com/a/164260
+		IFS=','
+		eccArgs=($2)
+		privkey=${eccArgs[0]}
+		pubkey=${eccArgs[1]}
+
+		if [[ -n $pubkey ]]; then
+			# https://jameshfisher.com/2017/04/14/openssl-ecc/
+			pass=$($sslPath pkeyutl -derive -inkey "$privkey" -peerkey "$pubkey" | $sslPath enc -base64 -A)
 		else
 			# https://stackoverflow.com/a/54926249
 			pass=$(\
-				$sslPath ec -in "$2" -pubout 2> /dev/null \
-				| $sslPath pkeyutl -derive -inkey "$2" -peerkey /dev/stdin \
+				$sslPath ec -in "$privkey" -pubout 2> /dev/null \
+				| $sslPath pkeyutl -derive -inkey "$privkey" -peerkey /dev/stdin \
 				| $sslPath enc -base64 -A \
 			)
 		fi
+		unset IFS eccArgs privkey pubkey
 		shift 2
 	;;
 	'-f')

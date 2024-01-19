@@ -1,17 +1,55 @@
 #! /bin/bash
 
-# TODO: add option to encrypt private key
+help_message() {
+printf "Usage:
+$0 <arguments>
 
-if [[ -z $@ ]]; then
-	printf "script.sh <keycurve> <keyname>\n"
-	printf "Type 'openssl ecparam -list_curves' to view key curves.\n"
-	exit
-fi
+Arguments:
+[ -h ] Show this help
+[ -l ] List all supported curves
+[ -c CURVE,KEYNAME ] Generate an ECDH key pair
+[ -d PRIVKEY,PUBKEY ] Generate a shared secret between a private and public key
+"
+}
 
-keycurve=${@:1:1}
-keyname=${@:2:1}
+ARGS=$(getopt -n openssl-ecdh -o c:d:lh -- "$@")
+eval set -- "$ARGS"
 
-openssl ecparam -name $keycurve -genkey -noout > ${keyname}.priv
-printf "Created private key '${keyname}.priv'\n"
-openssl ec -in ${keyname}.priv -pubout > ${keyname}.pub
-printf "Created public key '${keyname}.pub'\n"
+while :
+do case "$1" in
+	'-c')
+		# https://jameshfisher.com/2017/04/14/openssl-ecc/
+		# https://unix.stackexchange.com/a/164260
+		IFS=','
+		eccArgs=($2)
+		curve=${eccArgs[0]}
+		keyname=${eccArgs[1]}
+		unset IFS
+		openssl ecparam -name "$curve" -genkey -out "${keyname}.priv"
+		openssl ec -in "${keyname}.priv" -pubout -out "${keyname}.pub"
+		shift 2
+	;;
+	'-d')
+		IFS=','
+		keyArgs=($2)
+		privkey=${keyArgs[0]}
+		pubkey=${keyArgs[1]}
+		unset IFS
+		openssl pkeyutl -derive -inkey "$privkey" -peerkey "$pubkey" \
+		| openssl enc -base64 -A \
+		&& printf '\n'
+		shift 2
+	;;
+	'-l')
+		openssl ecparam -list_curves
+		exit
+	;;
+	'-h')
+		help_message
+		exit
+	;;
+	--)
+		shift
+		break
+	;;
+esac; done
