@@ -867,21 +867,42 @@ fi
 
 # https://www.baeldung.com/linux/copy-directory-structure
 
-if [[ -z $usetar ]]; then
+# if [[ -z $usetar ]]; then
+# 	if [[ -z $out ]]; then
+# 		out='./'
+# 	fi
+# 	find "$@" -type d \
+# 	| while read -r i; do
+# 		mkdir -p "${out}/${i}"
+# 	done
+# elif [[ -z $out ]]; then
+# 	if [[ $operation == 'e' ]]; then
+# 		printf '%s\n' "Error: tar archive name not defined. Exiting." "Define name with -o (see -h)"
+# 		exit 1
+# 	else
+# 		out='./'
+# 	fi
+# fi
+
+if [[ $operation == 'e' ]]; then
+	if [[ -z $out ]]; then
+		if [[ $usetar == 'y' ]]; then
+			printf '%s\n' "Error: tar archive name not defined. Exiting." "Define name with -o (see -h)"
+			exit 1
+		else
+			out='./'
+		fi
+	fi
+	mkdir -p "$out"
+else
 	if [[ -z $out ]]; then
 		out='./'
 	fi
+	mkdir -p "$out"
 	find "$@" -type d \
 	| while read -r i; do
 		mkdir -p "${out}/${i}"
 	done
-elif [[ -z $out ]]; then
-	if [[ $operation == 'e' ]]; then
-		printf '%s\n' "Error: tar archive name not defined. Exiting." "Define name with -o (see -h)"
-		exit 1
-	else
-		out='./'
-	fi
 fi
 
 # https://stackoverflow.com/questions/67563098/run-command-after-ctrlc-on-watch-command
