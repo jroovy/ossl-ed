@@ -867,6 +867,13 @@ fi
 
 # https://www.baeldung.com/linux/copy-directory-structure
 
+createDirTree() {
+	find "$@" -type d \
+	| while read -r i; do
+		mkdir -p "${out}/${i}"
+	done
+}
+
 if [[ $operation == 'e' ]]; then
 	if [[ -z $out ]]; then
 		if [[ $usetar == 'y' ]]; then
@@ -876,16 +883,21 @@ if [[ $operation == 'e' ]]; then
 			out='./'
 		fi
 	fi
-	mkdir -p "$out"
+	if [[ -n $usetar && $out == *'/'* ]]; then
+		mkdir -p "${out%/*}"
+	elif [[ -z $usetar ]]; then
+		out+='/'
+		mkdir -p "$out"
+		createDirTree "$@"
+	fi
 else
 	if [[ -z $out ]]; then
 		out='./'
+	else
+		out+='/'
 	fi
 	mkdir -p "$out"
-	find "$@" -type d \
-	| while read -r i; do
-		mkdir -p "${out}/${i}"
-	done
+	createDirTree "$@"
 fi
 
 # https://stackoverflow.com/questions/67563098/run-command-after-ctrlc-on-watch-command
