@@ -189,7 +189,11 @@ do case "$1" in
 		shift 2
 	;;
 	'-F')
-		passfile="${centralPassDir}/${2}.txt"
+		if [[ "${2##*.}" == 'txt' ]]; then
+			passfile="${centralPassDir}/${2}"
+		else
+			passfile="${centralPassDir}/${2}.txt"
+		fi
 		if [[ "$2" == *'/'* ]]; then
 			printf '%s\n' "Trying to specify directory to params file." "Use '-f' instead." "Aborting."
 			exit
