@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 sslPath='openssl'
 centralPassDir="${HOME}/.config/ossl-ed"
