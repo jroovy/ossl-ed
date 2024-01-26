@@ -867,7 +867,6 @@ if [[ -z $usetar ]]; then
 	if [[ -z $out ]]; then
 		out='./'
 	fi
-
 	find "$@" -type d \
 	| while read -r i; do
 		mkdir -p "${out}/${i}"
