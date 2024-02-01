@@ -461,7 +461,7 @@ osl-decrypt-in-ram() {
 		$sslPath ${osslArgs[@]} $base64Flag \
 		| osl-decrypt-in-ram
 	else
-		$sslPath ${osslArgs[@]}
+		$sslPath ${osslArgs[@]} $base64Flag
 	fi
 }
 
