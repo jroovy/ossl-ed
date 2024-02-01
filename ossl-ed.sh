@@ -345,7 +345,7 @@ gen-ossl-flags() {
 	osslArgs=( ${staticVals[@]} "-${algo}" "-md" "$hash" "-iter" "$iter" "-k" "$pass" )
 }
 
-passFile-assign-vars() {
+passfile-assign-vars() {
 	case "${i:0:1}" in
 		'1')
 			algo="${i:1}"
@@ -362,24 +362,24 @@ passFile-assign-vars() {
 	esac
 }
 
-passFile-get-params() {
+passfile-get-params() {
 	case "$paramChoice" in
-		'passFile-ram')
+		'passfile-ram')
 			# https://askubuntu.com/a/705131
 			for i in ${dataArray[@]:${startLine}:${endLine}}; do
-				passFile-assign-vars
+				passfile-assign-vars
 			done
 		;;
-		'passFile-sed')
+		'passfile-sed')
 			for i in ${dataArray[@]}; do
-				passFile-assign-vars
+				passfile-assign-vars
 			done
 		;;
 	esac
 	gen-ossl-flags
 }
 
-passFile-ram() {
+passfile-ram() {
 	case "$filetype" in
 		'0')
 			startLine=0
@@ -402,11 +402,11 @@ passFile-ram() {
 			endLine=4
 		;;
 	esac
-	passFile-get-params
+	passfile-get-params
 	unset startLine endLine
 }
 
-passFile-sed() {
+passfile-sed() {
 	case "$filetype" in
 		'0')
 			startLine=2
@@ -430,7 +430,7 @@ passFile-sed() {
 		;;
 	esac
 	dataArray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$passFile") )
-	passFile-get-params
+	passfile-get-params
 	unset startLine endLine dataArray
 }
 
@@ -834,7 +834,7 @@ else
 	done
 	
 	if [[ loop -gt 1000 ]]; then
-		paramChoice='passFile-sed'
+		paramChoice='passfile-sed'
 	else
 		case "$filetype" in
 			'0')
@@ -858,7 +858,7 @@ else
 				endLine=$(( (loop * 5) + startLine ))
 			;;
 		esac
-		paramChoice='passFile-ram'
+		paramChoice='passfile-ram'
 		dataArray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$passFile") )
 	fi
 	
