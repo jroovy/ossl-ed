@@ -130,7 +130,7 @@ do case "$1" in
 		shift
 	;;
 	'-r')
-		if [[ ${#recurVal[@]} -eq 0 ]]; then
+		if (( ${#recurVal[@]} == 0 )); then
 			recurVal+=( '-name' "*$2" )
 		else
 			recurVal+=( '-o' '-name' "*$2" )
@@ -177,7 +177,8 @@ do case "$1" in
 				| $sslPath enc -base64 -A \
 			)
 		fi
-		unset IFS eccArgs privKey pubKey
+		IFS=' '
+		unset eccArgs privKey pubKey
 		shift 2
 	;;
 	'-f')
@@ -440,7 +441,7 @@ osl-encrypt-in-ram() {
 	(( n ++ ))
 	(( rcount ++ ))
 
-	if [[ rcount -lt loop ]]; then
+	if (( rcount < loop )); then
 		$sslPath ${osslArgs[@]} \
 		| osl-encrypt-in-ram
 	else
@@ -454,10 +455,10 @@ osl-decrypt-in-ram() {
 	(( n -- ))
 	(( rcount ++ ))
 	
-	if [[ rcount -gt 1 ]]; then
+	if (( rcount > 1 )); then
 		unset base64Flag
 	fi
-	if [[ rcount -lt loop ]]; then
+	if (( rcount < loop )); then
 		$sslPath ${osslArgs[@]} $base64Flag \
 		| osl-decrypt-in-ram
 	else
@@ -468,10 +469,10 @@ osl-decrypt-in-ram() {
 osl-encrypt-in-tmp() {
 	for (( rcount = 0; rcount < loop; n ++ )); do
 		$paramChoice
-		if [[ rcount -eq 0 ]]; then
+		if (( rcount == 0 )); then
 			$sslPath ${osslArgs[@]} \
 				-out "${tmpDir}/${randID}-$(( rcount + 1 ))${tmpExt}"
-		elif ! [[ rcount -eq lastOne ]]; then
+		elif (( rcount != lastOne )); then
 			$sslPath ${osslArgs[@]} \
 				-in "${tmpDir}/${randID}-${rcount}${tmpExt}" \
 				-out "${tmpDir}/${randID}-$(( rcount + 1 ))${tmpExt}"
@@ -488,10 +489,10 @@ osl-encrypt-in-tmp() {
 osl-decrypt-in-tmp() {
 	for (( rcount = 0; rcount < loop; n -- )); do
 		$paramChoice
-		if [[ rcount -eq 0 ]]; then
+		if (( rcount == 0 )); then
 			$sslPath ${osslArgs[@]} $base64Flag \
 				-out "${tmpDir}/${randID}-$(( rcount + 1 ))${tmpExt}" 
-		elif ! [[ rcount -eq lastOne ]]; then
+		elif (( rcount != lastOne )); then
 			$sslPath ${osslArgs[@]} \
 				-in "${tmpDir}/${randID}-${rcount}${tmpExt}" \
 				-out "${tmpDir}/${randID}-$(( rcount + 1 ))${tmpExt}"
@@ -508,7 +509,7 @@ osl-decrypt-in-tmp() {
 osl-encrypt() {
 	n=0
 	rcount=0
-	if [[ loop -lt 2 || $operationType == 'inram' ]]; then
+	if (( loop < 2 )) || [[ $operationType == 'inram' ]]; then
 		osl-encrypt-in-ram
 	elif [[ $operationType == 'intmp' ]]; then
 		lastOne=$(( loop - 1 ))
@@ -519,7 +520,7 @@ osl-encrypt() {
 osl-decrypt() {
 	n=$(( loop - 1 ))
 	rcount=0
-	if [[ loop -lt 2 || $operationType == 'inram' ]]; then
+	if (( loop < 2 )) || [[ $operationType == 'inram' ]]; then
 		osl-decrypt-in-ram
 	elif [[ $operationType == 'intmp' ]]; then
 		lastOne=$(( loop - 1 ))
@@ -682,7 +683,7 @@ encrypt-notar() {
 }
 
 encrypt-tar() {
-	if [[ ${#recurVal[@]} -eq 0 ]]; then
+	if (( ${#recurVal[@]} == 0 )); then
 		tar -cf - "$@"
 	else
 		# https://stackoverflow.com/questions/18731603/how-to-tar-certain-file-types-in-all-subdirectories
@@ -716,6 +717,7 @@ decrypt-all() {
 	# https://stackoverflow.com/questions/965053/extract-filename-and-extension-in-bash
 	i1=${@%.*}
 	i2=${@##*.}
+	i3=${i1}.tmp
 	if [[ "$i2" == 'b64-'* ]]; then
 		base64Flag='-base64'
 	else
@@ -746,21 +748,25 @@ decrypt-all() {
 		*'enc-osl')
 			printf "$work $oslDec '$@'"
 			if
-				osl-decrypt > "${out}${i1}"
+				osl-decrypt > "${out}${i3}"
 			then
 				printf "${clear}$success $oslDec '$@'\n"
+				mv "${out}${i3}" "${out}${i1}"
 			else
 				printf "${clear}$fail $oslDec '$@'\n"
+				rm "${out}${i3}"
 			fi
 		;;
 		*)
 			printf "$work $oslDec '$@'"
 			if
-				osl-decrypt | data-decompress > "${out}${i1}"
+				osl-decrypt | data-decompress > "${out}${i3}"
 			then
 				printf "${clear}$success $oslDec '$@'\n"
+				mv "${out}${i3}" "${out}${i1}"
 			else
 				printf "${clear}$fail $oslDec '$@'\n"
+				rm "${out}${i3}"
 			fi
 		;;
 	esac < "$@"
@@ -833,7 +839,7 @@ else
 		esac
 	done
 	
-	if [[ loop -gt 1000 ]]; then
+	if (( loop > 1000 )); then
 		paramChoice='passfile-sed'
 	else
 		case "$filetype" in
@@ -913,17 +919,17 @@ if [[ $operation == 'e' ]]; then
 		base64Flag='-base64'
 	fi
 	case "$useTar" in
-		'')
+		'y')
+			trap delete-temp-files SIGINT
+			encrypt-tar "$@"
+		;;
+		*)
 			find "$@" -type f ! -name '*-osl' ${recurVal[@]} \
 			| while read -r i; do
 				i1="$i"
 				trap delete-temp-files SIGINT
 				encrypt-notar "$i"
 			done
-		;;
-		'y')
-			trap delete-temp-files SIGINT
-			encrypt-tar "$@"
 		;;
 	esac
 elif [[ $operation == 'd' ]]; then
