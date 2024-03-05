@@ -4,21 +4,21 @@ sslPath='openssl'
 centralPassDir="${HOME}/.config/ossl-ed"
 
 help_msg() {
-yellow='\033[0;93m'
-reset='\033[0m'
+# yellow='\033[0;93m'
+# reset='\033[0m'
 printf "\nUsage:
 $0 <options>
 
-# Options marked in ${yellow}yellow${reset} are required
 Options:
-  ${yellow}[ -a ALGO ]${reset} Encryption algorithm
-  ${yellow}[ -s HASH ]${reset} Password hash
-  ${yellow}[ -i LO-HI ]${reset} Number range of password iterations
-       Append 's' before LO-HI for static iteration,
-       and replace LO-HI with a single NUMBER
-  ${yellow}[ -c ROUNDS ]${reset} Number of encryption rounds
-  ${yellow}[ -p LENGTH ]${reset} Length of generated passwords
+  [ -a ALGO ] Encryption algorithm
+  [ -s HASH ] Password hash
+  [ -i LO-HI ] Number range of password iterations
+       Replace LO-HI with a single number for static iteration
+  [ -c ROUNDS ] Number of encryption rounds
+  [ -p LENGTH ] Length of generated passwords
        Append 's' before LENGTH for static password
+  [ -e LO-HI ] Number range of salt length
+       Replace LO-HI with a single number for static iteration
   [ -k PRIVKEY,PUBKEY ] Use ECDH shared secret as password
   [ -t asip ] Choose which parameters are static
        a: algorithm, s: hash
@@ -48,10 +48,10 @@ if [[ -z $@ ]]; then
 	exit
 fi
 
-mode=4
-dynVals=( 'a' 'h' 'i' 'p' )
+dynamicVals=( 'a' 'h' 'i' 's' 'p' )
+mode=${#dynamicVals[@]}
 
-ARGS=$(getopt -n openssl-multigen -o a:s:i:c:p:k:d:o:n:frh -- "$@")
+ARGS=$(getopt -n openssl-multigen -o a:e:s:i:c:p:k:d:o:n:frh -- "$@")
 eval set -- "$ARGS"
 
 while :
@@ -59,31 +59,45 @@ do case "$1" in
 	'-a')
 		algo="$2"
 		# https://stackoverflow.com/questions/16860877/remove-an-element-from-a-bash-array
-		(( mode -- ))
-		dynVals=( "${dynVals[@]/a}" )
-		statVals+=('a')
+		dynamicVals=( "${dynamicVals[@]/a}" )
+		staticVals+=('a')
 		algoLength=1
+		(( mode -- ))
+		shift 2
+	;;
+	'-e')
+		if [[ "$2" == *'-'* ]]; then
+			dynamicSalt=1
+			saltVal="$2"
+		else
+			dynamicVals=( "${dynamicVals[@]/s}" )
+			staticVals+=('s')
+			is="$2"
+			saltVal="${is}-${is}"
+			unset is
+			(( mode -- ))
+		fi
 		shift 2
 	;;
 	'-s')
 		hash="$2"
-		(( mode -- ))
-		dynVals=( "${dynVals[@]/h}" )
-		statVals+=('h')
+		dynamicVals=( "${dynamicVals[@]/h}" )
+		staticVals+=('h')
 		hashLength=1
+		(( mode -- ))
 		shift 2
 	;;
 	'-i')
-		if [[ "${2:0:1}" == 's' ]]; then
-			(( mode -- ))
-			dynVals=( "${dynVals[@]/i}" )
-			statVals+=('i')
-			is="${2:1}"
-			iterval="${is}-${is}"
-			unset is
+		if [[ "$2" == *'-'* ]]; then
+			dynamicIteration=1
+			iterVal="$2"
 		else
-			dynIter=1
-			iterval="$2"
+			dynamicVals=( "${dynamicVals[@]/i}" )
+			staticVals+=('i')
+			is="$2"
+			iterVal="${is}-${is}"
+			unset is
+			(( mode -- ))
 		fi
 		shift 2
 	;;
@@ -93,12 +107,12 @@ do case "$1" in
 	;;
 	'-p')
 		if [[ "${2:0:1}" == 's' ]]; then
-			(( mode -- ))
-			dynVals=( "${dynVals[@]/p}" )
-			statVals+=('p')
 			length="${2:1}"
+			dynamicVals=( "${dynamicVals[@]/p}" )
+			staticVals+=('p')
+			(( mode -- ))
 		else
-			dynPass=1
+			dynamicPass=1
 			length="$2"
 		fi
 		if [[ length -gt 512 ]]; then
@@ -110,8 +124,8 @@ do case "$1" in
 	'-k')
 		secret=$($sslPath pkeyutl -derive -inkey "${2%,*}" -peerkey "${2##*,}" | $sslPath enc -base64 -A)
 		length=${#secret}
-		dynVals=( "${dynVals[@]/p}" )
-		statVals+=('p')
+		dynamicVals=( "${dynamicVals[@]/p}" )
+		staticVals+=('p')
 		(( mode -- ))
 		shift 2
 	;;
@@ -202,24 +216,38 @@ do case "$1" in
 esac; done
 
 if [[ -z $algo ]]; then
-	echo "Algorithm not defined. Exiting."
-	exit
+	algo='aes-256-cfb'
+	dynamicVals=( "${dynamicVals[@]/a}" )
+	staticVals+=('a')
+	algoLength=1
+	(( mode -- ))
 fi
 if [[ -z $hash ]]; then
-	echo "Hash not defined. Exiting."
-	exit
+	hash="sha512"
+	dynamicVals=( "${dynamicVals[@]/h}" )
+	staticVals+=('h')
+	hashLength=1
+	(( mode -- ))
 fi
-if [[ -z $iterval ]]; then
-	echo "Password iterations not defined. Exiting."
-	exit
+if [[ -z $iterVal ]]; then
+	dynamicVals=( "${dynamicVals[@]/i}" )
+	staticVals+=('i')
+	iterVal="10000-10000"
+	unset is
+	(( mode -- ))
 fi
 if [[ -z $rounds ]]; then
-	echo "Password count not defined. Exiting."
-	exit
+	rounds=1
+fi
+if [[ -z $saltVal ]]; then
+	dynamicVals=( "${dynamicVals[@]/s}" )
+	staticVals+=('s')
+	saltVal='16-16'
+	(( mode -- ))
 fi
 if [[ -z $length ]]; then
-	echo "Password length not defined. Exiting."
-	exit
+	length=40
+	dynamicPass=1
 fi
 if [[ -z $genmode ]]; then
 	genmode='secure'
@@ -235,7 +263,7 @@ fi
 
 gen-static() {
 printf '%s\n' "[Cascade Encryption Parameters]" "0${rounds}"
-for i in ${statVals[@]}; do
+for i in ${staticVals[@]}; do
 	case "$i" in
 		'a')
 			printf '%s\n' "1${algo[ $((RANDOM % algoLength)) ]}"
@@ -244,18 +272,21 @@ for i in ${statVals[@]}; do
 			printf '%s\n' "2${hash[ $((RANDOM % hashLength)) ]}"
 		;;
 		'i')
-			printf '%s\n' "3$(shuf -n 1 -i $iterval)"
+			printf '%s\n' "3$(shuf -n 1 -i $iterVal)"
+		;;
+		's')
+			printf '%s\n' "4$(shuf -n 1 -i $saltVal)"
 		;;
 		'p')
 			if [[ -z $secret ]]; then
-				printf '%s\n' "4$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)"
+				printf '%s\n' "5$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)"
 			else
-				printf '%s\n' "4$secret"
+				printf '%s\n' "5${secret}"
 			fi
 		;;
 	esac
 done
-unset statVals
+unset staticVals
 printf '%s' "==============================="
 }
 
@@ -265,13 +296,16 @@ gen-static
 
 if [[ $genmode == 'secure' ]]; then
 	for (( i = 0; i < rounds; i ++ )); do
-		if [[ dynPass -eq 1 ]]; then
+		if (( dynamicPass == 1 )); then
 			pass=$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)
 		fi
-		if [[ dynIter -eq 1 ]]; then
-			iter=$(shuf -n 1 -i $iterval)
+		if (( dynamicIteration == 1 )); then
+			iter=$(shuf -n 1 -i $iterVal)
 		fi
-		for j in ${dynVals[@]}; do
+		if (( dynamicSalt == 1 )); then
+			salt=$(shuf -n 1 -i $saltVal)
+		fi
+		for j in ${dynamicVals[@]}; do
 			case "$j" in
 				'a')
 					printf '\n%s' "1${algo[ $((RANDOM % algoLength)) ]}"
@@ -282,18 +316,21 @@ if [[ $genmode == 'secure' ]]; then
 				'i')
 					printf '\n%s' "3${iter}"
 				;;
+				's')
+					printf '\n%s' "4${salt}"
+				;;
 				'p')
-					printf '\n%s' "4${pass}"
+					printf '\n%s' "5${pass}"
 				;;
 			esac
 		done
 		${printNewline[@]}
 	done
 elif [[ $genmode == 'fast' ]]; then
-		if [[ rounds -gt 10000 ]]; then
+	if (( rounds > 10000 )); then
 		prod=$(( rounds / 10000 ))
 		remainder=$(( rounds % 10000 ))
-		if [[ remainder -gt 0 ]]; then
+		if (( remainder > 0 )); then
 			runs=$(( prod + 1 ))
 		else
 			runs="$prod"
@@ -306,20 +343,20 @@ elif [[ $genmode == 'fast' ]]; then
 	fi
 
 	for (( runcount = 0; runcount < runs; runcount ++ )); do
-		if [[ runcount -eq prod ]]; then
+		if (( runcount == prod )); then
 			subruns="$remainder"
 		fi
-		
-		if [[ dynIter -eq 1 ]]; then
-			iter=( $(shuf -r -n $subruns -i $iterval) )
+		if (( dynamicIteration == 1 )); then
+			iter=( $(shuf -r -n $subruns -i $iterVal) )
 		fi
-
-		if [[ dynPass -eq 1 ]]; then
+		if (( dynamicSalt == 1 )); then
+			salt=( $(shuf -r -n $subruns -i $saltVal) )
+		fi
+		if (( dynamicPass == 1 )); then
 			pass=( $(cat $randomtype | tr -dc '[:graph:]' | head -c $(( length * subruns )) | fold -w $length) )
 		fi
-
 		for (( i = 0; i < subruns; i ++ )); do
-			for j in ${dynVals[@]}; do
+			for j in ${dynamicVals[@]}; do
 				case "$j" in
 					'a')
 						printf '\n%s' "1${algo[ $((RANDOM % algoLength)) ]}"
@@ -330,8 +367,11 @@ elif [[ $genmode == 'fast' ]]; then
 					'i')
 						printf '\n%s' "3${iter[ $i ]}"
 					;;
+					's')
+						printf '\n%s' "4${salt[ $i ]}"
+					;;
 					'p')
-						printf '\n%s' "4${pass[ $i ]}"
+						printf '\n%s' "5${pass[ $i ]}"
 					;;
 				esac
 			done

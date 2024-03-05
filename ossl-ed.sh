@@ -22,6 +22,7 @@ Options:
   [ -a ALGO ] Encryption algorithm to use
   [ -s HASH ] Hash algorithm to use
   [ -i NUM ] Pasword hash iteration
+  [ -w NUM ] Salt length of KDF
   [ -t ] Compress file(s) into tar archive
   [ -z ] Extract tar archives into separate folders
   [ -c COMPRESSION ] Compress file(s)
@@ -108,7 +109,7 @@ $0 -da aes-256-cbc -s sha512 -i 1000 -p Passw0rd file1 folder2 file3* ...
 "
 }
 
-ARGS=$(getopt -n openssl-encrypt -o edr:bgp:k:f:F:a:s:i:tzc:m:o:jh -- "$@")
+ARGS=$(getopt -n openssl-encrypt -o edr:bgp:k:f:F:a:s:i:w:tzc:m:o:jh -- "$@")
 eval set -- "$ARGS"
 
 while :
@@ -217,6 +218,10 @@ do case "$1" in
 	;;
 	'-i')
 		iter="$2"
+		shift 2
+	;;
+	'-w')
+		salt="$2"
 		shift 2
 	;;
 	'-t')
@@ -343,7 +348,7 @@ delete-temp-files() {
 }
 
 gen-ossl-flags() {
-	osslArgs=( ${staticVals[@]} "-${algo}" "-md" "$hash" "-iter" "$iter" "-k" "$pass" )
+	osslArgs=( ${staticVals[@]} "-${algo}" "-saltlen" "$salt" "-md" "$hash" "-iter" "$iter" "-k" "$pass" )
 }
 
 passfile-assign-vars() {
@@ -358,6 +363,9 @@ passfile-assign-vars() {
 			iter="${i:1}"
 		;;
 		'4')
+			salt="${i:1}"
+		;;
+		'5')
 			pass="${i:1}"
 		;;
 	esac
@@ -384,7 +392,7 @@ passfile-ram() {
 	case "$filetype" in
 		'0')
 			startLine=0
-			endLine=5
+			endLine=7
 		;;
 		'1')
 			startLine=$n
@@ -402,6 +410,10 @@ passfile-ram() {
 			startLine=$(( 4 * n ))
 			endLine=4
 		;;
+		'5')
+			startLine=$(( 5 * n ))
+			endLine=5
+		;;
 	esac
 	passfile-get-params
 	unset startLine endLine
@@ -411,23 +423,27 @@ passfile-sed() {
 	case "$filetype" in
 		'0')
 			startLine=2
-			endLine=6
+			endLine=7
 		;;
 		'1')
-			startLine=$(( n + 7 ))
+			startLine=$(( n + 8 ))
 			endLine=$startLine
 		;;
 		'2')
-			startLine=$(( (3 * n) + 6 ))
+			startLine=$(( (3 * n) + 7 ))
 			endLine=$(( startLine + 1 ))
 		;;
 		'3')
-			startLine=$(( (4 * n) + 5 ))
+			startLine=$(( (4 * n) + 6 ))
 			endLine=$(( startLine + 2 ))
 		;;
 		'4')
-			startLine=$(( (5 * n) + 4 ))
+			startLine=$(( (5 * n) + 5 ))
 			endLine=$(( startLine + 3 ))
+		;;
+		'5')
+			startLine=$(( (6 * n) + 4 ))
+			endLine=$(( startLine + 4 ))
 		;;
 	esac
 	dataArray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$passFile") )
@@ -798,6 +814,9 @@ if [[ -z $passFile ]]; then
 	if [[ -z $iter ]]; then
 		iter='10000'
 	fi
+	if [[ -z $salt ]]; then
+		salt='16'
+	fi
 	loop=1
 	gen-ossl-flags
 	unset paramChoice
@@ -810,8 +829,8 @@ else
 		exit
 	fi
 	
-	filetype=4
-	cval=( $(sed -n "2,6p;6q" "$passFile") )
+	filetype=5
+	cval=( $(sed -n "2,7p;7q" "$passFile") )
 	for i in ${cval[@]}; do
 		case "${i:0:1}" in
 			'0')
@@ -830,6 +849,10 @@ else
 				(( filetype -- ))
 			;;
 			'4')
+				salt="${i:1}"
+				(( filetype -- ))
+			;;
+			'5')
 				pass="${i:1}"
 				(( filetype -- ))
 			;;
@@ -845,23 +868,27 @@ else
 		case "$filetype" in
 			'0')
 				startLine=2
-				endLine=6
+				endLine=7
 			;;
 			'1')
-				startLine=7
+				startLine=8
 				endLine=$(( loop + startLine ))
 			;;
 			'2')
-				startLine=6
+				startLine=7
 				endLine=$(( (loop * 3) + startLine ))
 			;;
 			'3')
-				startLine=5
+				startLine=6
 				endLine=$(( (loop * 4) + startLine ))
 			;;
 			'4')
-				startLine=4
+				startLine=5
 				endLine=$(( (loop * 5) + startLine ))
+			;;
+			'5')
+				startLine=4
+				endLine=$(( (loop * 6) + startLine ))
 			;;
 		esac
 		paramChoice='passfile-ram'
