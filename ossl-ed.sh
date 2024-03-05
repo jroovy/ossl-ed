@@ -730,7 +730,7 @@ encrypt-tar() {
 }
 
 decrypt-all() {
-	# https://stackoverflow.com/questions/965053/extract-filename-and-extension-in-bash
+	# https://stackoverflow.com/a/965069
 	i1=${@%.*}
 	i2=${@##*.}
 	i3=${i1}.tmp

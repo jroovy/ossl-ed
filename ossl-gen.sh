@@ -67,12 +67,21 @@ do case "$1" in
 	;;
 	'-e')
 		if [[ "$2" == *'-'* ]]; then
-			dynamicSalt=1
-			saltVal="$2"
+			if (( ${2%-*} > 16 || ${2#*-} > 16 )); then
+				printf '%s\n' "Warning: SALT cannot be greater than 16"
+			else
+				saltVal="$2"
+				dynamicSalt=1
+			fi
 		else
+			if (( $2 > 16 )); then
+				printf '%s\n' "Warning: SALT cannot be greater than 16"
+				is=16
+			else
+				is="$2"
+			fi
 			dynamicVals=( "${dynamicVals[@]/s}" )
 			staticVals+=('s')
-			is="$2"
 			saltVal="${is}-${is}"
 			unset is
 			(( mode -- ))
