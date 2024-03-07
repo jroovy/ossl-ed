@@ -295,8 +295,29 @@ for i in ${staticVals[@]}; do
 		;;
 	esac
 done
+printf '#'
+for i in ${dynamicVals[@]}; do
+	case "$i" in
+		'a')
+			printf '1'
+		;;
+		'h')
+			printf '2'
+		;;
+		'i')
+			printf '3'
+		;;
+		's')
+			printf '4'
+		;;
+		'p')
+			printf '5'
+		;;
+	esac
+	printf ','
+done
 unset staticVals
-printf '%s' "==============================="
+printf '\n%s' "==============================="
 }
 
 generate-file() {
@@ -317,19 +338,19 @@ if [[ $genmode == 'secure' ]]; then
 		for j in ${dynamicVals[@]}; do
 			case "$j" in
 				'a')
-					printf '\n%s' "1${algo[ $((RANDOM % algoLength)) ]}"
+					printf '\n%s' "${algo[ $((RANDOM % algoLength)) ]}"
 				;;
 				'h')
-					printf '\n%s' "2${hash[ $((RANDOM % hashLength)) ]}"
+					printf '\n%s' "${hash[ $((RANDOM % hashLength)) ]}"
 				;;
 				'i')
-					printf '\n%s' "3${iter}"
+					printf '\n%s' "${iter}"
 				;;
 				's')
-					printf '\n%s' "4${salt}"
+					printf '\n%s' "${salt}"
 				;;
 				'p')
-					printf '\n%s' "5${pass}"
+					printf '\n%s' "${pass}"
 				;;
 			esac
 		done
@@ -368,19 +389,19 @@ elif [[ $genmode == 'fast' ]]; then
 			for j in ${dynamicVals[@]}; do
 				case "$j" in
 					'a')
-						printf '\n%s' "1${algo[ $((RANDOM % algoLength)) ]}"
+						printf '\n%s' "${algo[ $((RANDOM % algoLength)) ]}"
 					;;
 					'h')
-						printf '\n%s' "2${hash[ $((RANDOM % hashLength)) ]}"
+						printf '\n%s' "${hash[ $((RANDOM % hashLength)) ]}"
 					;;
 					'i')
-						printf '\n%s' "3${iter[ $i ]}"
+						printf '\n%s' "${iter[ $i ]}"
 					;;
 					's')
-						printf '\n%s' "4${salt[ $i ]}"
+						printf '\n%s' "${salt[ $i ]}"
 					;;
 					'p')
-						printf '\n%s' "5${pass[ $i ]}"
+						printf '\n%s' "${pass[ $i ]}"
 					;;
 				esac
 			done

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# DO NOT MODIFY IFS AND OIFS VARIABLES
+OIFS="$IFS"
+
 sslPath='openssl'
 tmpDir='/tmp'
 centralPassDir="${HOME}/.config/ossl-ed"
@@ -178,7 +181,7 @@ do case "$1" in
 				| $sslPath enc -base64 -A \
 			)
 		fi
-		IFS=' '
+		IFS="$OIFS"
 		unset eccArgs privKey pubKey
 		shift 2
 	;;
@@ -352,36 +355,40 @@ gen-ossl-flags() {
 }
 
 passfile-assign-vars() {
-	case "${i:0:1}" in
+	case "${orderArray[orderCount]}" in
 		'1')
-			algo="${i:1}"
+			algo="$i"
 		;;
 		'2')
-			hash="${i:1}"
+			hash="$i"
 		;;
 		'3')
-			iter="${i:1}"
+			iter="$i"
 		;;
 		'4')
-			salt="${i:1}"
+			salt="$i"
 		;;
 		'5')
-			pass="${i:1}"
+			pass="$i"
 		;;
 	esac
 }
 
 passfile-get-params() {
+	# orderCount=0
+	unset orderCount
 	case "$paramChoice" in
 		'passfile-ram')
 			# https://askubuntu.com/a/705131
 			for i in ${dataArray[@]:${startLine}:${endLine}}; do
 				passfile-assign-vars
+				((orderCount ++))
 			done
 		;;
 		'passfile-sed')
 			for i in ${dataArray[@]}; do
 				passfile-assign-vars
+				((orderCount ++))
 			done
 		;;
 	esac
@@ -423,26 +430,26 @@ passfile-sed() {
 	case "$filetype" in
 		'0')
 			startLine=2
-			endLine=7
+			endLine=8
 		;;
 		'1')
-			startLine=$(( n + 8 ))
+			startLine=$(( n + 9 ))
 			endLine=$startLine
 		;;
 		'2')
-			startLine=$(( (3 * n) + 7 ))
+			startLine=$(( (3 * n) + 8 ))
 			endLine=$(( startLine + 1 ))
 		;;
 		'3')
-			startLine=$(( (4 * n) + 6 ))
+			startLine=$(( (4 * n) + 7 ))
 			endLine=$(( startLine + 2 ))
 		;;
 		'4')
-			startLine=$(( (5 * n) + 5 ))
+			startLine=$(( (5 * n) + 6 ))
 			endLine=$(( startLine + 3 ))
 		;;
 		'5')
-			startLine=$(( (6 * n) + 4 ))
+			startLine=$(( (6 * n) + 5 ))
 			endLine=$(( startLine + 4 ))
 		;;
 	esac
@@ -830,7 +837,7 @@ else
 	fi
 	
 	filetype=5
-	cval=( $(sed -n "2,7p;7q" "$passFile") )
+	cval=( $(sed -n "2,8p;8q" "$passFile") )
 	for i in ${cval[@]}; do
 		case "${i:0:1}" in
 			'0')
@@ -856,6 +863,11 @@ else
 				pass="${i:1}"
 				(( filetype -- ))
 			;;
+			'#')
+				IFS=','
+				orderArray=(${i:1})
+				IFS="$OIFS"
+			;;
 			*)
 				break
 			;;
@@ -868,26 +880,26 @@ else
 		case "$filetype" in
 			'0')
 				startLine=2
-				endLine=7
+				endLine=8
 			;;
 			'1')
-				startLine=8
+				startLine=9
 				endLine=$(( loop + startLine ))
 			;;
 			'2')
-				startLine=7
+				startLine=8
 				endLine=$(( (loop * 3) + startLine ))
 			;;
 			'3')
-				startLine=6
+				startLine=7
 				endLine=$(( (loop * 4) + startLine ))
 			;;
 			'4')
-				startLine=5
+				startLine=6
 				endLine=$(( (loop * 5) + startLine ))
 			;;
 			'5')
-				startLine=4
+				startLine=5
 				endLine=$(( (loop * 6) + startLine ))
 			;;
 		esac
