@@ -375,7 +375,6 @@ passfile-assign-vars() {
 }
 
 passfile-get-params() {
-	# orderCount=0
 	unset orderCount
 	case "$paramChoice" in
 		'passfile-ram')
