@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# DO NOT MODIFY IFS AND OIFS VARIABLES
-OIFS="$IFS"
-
 sslPath='openssl'
 tmpDir='/tmp'
 centralPassDir="${HOME}/.config/ossl-ed"
@@ -111,6 +108,9 @@ $0 -da aes-256-cbc -s sha512 -i 1000 -p Passw0rd file1 folder2 file3* ...
 
 "
 }
+
+# DO NOT MODIFY IFS AND OIFS VARIABLES
+OIFS="$IFS"
 
 ARGS=$(getopt -n openssl-encrypt -o edr:bgp:k:f:F:a:s:i:w:tzc:m:o:jh -- "$@")
 eval set -- "$ARGS"
