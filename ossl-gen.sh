@@ -211,7 +211,7 @@ do case "$1" in
 		shift
 	;;
 	'-r')
-		randomtype='/dev/random'
+		randomType='/dev/random'
 		shift
 	;;
 	'-h')
@@ -266,8 +266,8 @@ if [[ mode -gt 1 ]]; then
 else
 	printOne=( 'printf' '\n' )
 fi
-if [[ -z $randomtype ]]; then
-	randomtype='/dev/urandom'
+if [[ -z $randomType ]]; then
+	randomType='/dev/urandom'
 fi
 
 gen-static() {
@@ -288,7 +288,7 @@ for i in ${staticVals[@]}; do
 		;;
 		'p')
 			if [[ -z $secret ]]; then
-				printf '%s\n' "5$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)"
+				printf '%s\n' "5$(cat $randomType | tr -dc '[:graph:]' | head -c $length)"
 			else
 				printf '%s\n' "5${secret}"
 			fi
@@ -327,7 +327,7 @@ gen-static
 if [[ $genmode == 'secure' ]]; then
 	for (( i = 0; i < rounds; i ++ )); do
 		if (( dynamicPass == 1 )); then
-			pass=$(cat $randomtype | tr -dc '[:graph:]' | head -c $length)
+			pass=$(cat $randomType | tr -dc '[:graph:]' | head -c $length)
 		fi
 		if (( dynamicIteration == 1 )); then
 			iter=$(shuf -n 1 -i $iterVal)
@@ -357,35 +357,35 @@ if [[ $genmode == 'secure' ]]; then
 		${printNewline[@]}
 	done
 elif [[ $genmode == 'fast' ]]; then
-	if (( rounds > 10000 )); then
-		prod=$(( rounds / 10000 ))
-		remainder=$(( rounds % 10000 ))
+	if (( rounds > 1000 )); then
+		prod=$(( rounds / 1000 ))
+		remainder=$(( rounds % 1000 ))
 		if (( remainder > 0 )); then
 			runs=$(( prod + 1 ))
 		else
 			runs="$prod"
 		fi
-		subruns=10000
+		subRuns=1000
 	else
 		runs=1
 		prod=0
 		remainder="$rounds"
 	fi
 
-	for (( runcount = 0; runcount < runs; runcount ++ )); do
-		if (( runcount == prod )); then
-			subruns="$remainder"
+	for (( runCount = 0; runCount < runs; runCount ++ )); do
+		if (( runCount == prod )); then
+			subRuns="$remainder"
 		fi
 		if (( dynamicIteration == 1 )); then
-			iter=( $(shuf -r -n $subruns -i $iterVal) )
+			iter=( $(shuf -r -n $subRuns -i $iterVal) )
 		fi
 		if (( dynamicSalt == 1 )); then
-			salt=( $(shuf -r -n $subruns -i $saltVal) )
+			salt=( $(shuf -r -n $subRuns -i $saltVal) )
 		fi
 		if (( dynamicPass == 1 )); then
-			pass=( $(cat $randomtype | tr -dc '[:graph:]' | head -c $(( length * subruns )) | fold -w $length) )
+			pass=( $(cat $randomType | tr -dc '[:graph:]' | head -c $(( length * subRuns )) | fold -w $length) )
 		fi
-		for (( i = 0; i < subruns; i ++ )); do
+		for (( i = 0; i < subRuns; i ++ )); do
 			for j in ${dynamicVals[@]}; do
 				case "$j" in
 					'a')
