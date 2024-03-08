@@ -375,22 +375,22 @@ passfile-assign-vars() {
 }
 
 passfile-get-params() {
-	unset orderCount
 	case "$paramChoice" in
 		'passfile-ram')
 			# https://askubuntu.com/a/705131
 			for i in ${dataArray[@]:${startLine}:${endLine}}; do
 				passfile-assign-vars
-				((orderCount ++))
+				(( orderCount ++ ))
 			done
 		;;
 		'passfile-sed')
 			for i in ${dataArray[@]}; do
 				passfile-assign-vars
-				((orderCount ++))
+				(( orderCount ++ ))
 			done
 		;;
 	esac
+	unset orderCount
 	gen-ossl-flags
 }
 
