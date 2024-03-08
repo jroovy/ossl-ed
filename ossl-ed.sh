@@ -300,10 +300,11 @@ if [[ -z $@ ]]; then
 	exit
 fi
 
-# Progress indicator text
-
+# Static parameters when encrypting/decrypting
 staticVals=( 'enc' "-${operation}" '-salt' '-pbkdf2' )
 tmpExt='.osltmp'
+
+# Progress indicator text
 
 # https://unix.stackexchange.com/questions/26576/how-to-delete-line-with-echo
 clear='\r\033[2K'
