@@ -45,19 +45,22 @@ example_msg() {
 printf "
 ## Parameter file:
 
-The file should be in the following format:
+The file should be similar to following format:
 [Cascade Encryption Parameters]
 0NUM
+#1,2,3,4,5
 ===============================
-1ALGORITHM
-2HASH
-3ITERATIONS
-4PASSWORD
+ALGORITHM
+HASH
+ITERATIONS
+SALT
+PASSWORD
 
-1ALGORITHM
-2HASH
-3ITERATIONS
-4PASSWORD
+ALGORITHM
+HASH
+ITERATIONS
+SALT
+PASSWORD
 
 ...etc
 
@@ -65,16 +68,19 @@ The file should be in the following format:
 
 [Cascade Encryption Parameters]
 02
+#1,2,3,4,5
 ===============================
-1aes-256-cbc
-2sha512
-310000
-4Password1
+aes-256-cbc
+sha512
+10000
+16
+Password1
 
-1aes-256-cbc
-2sha512
-320000
-4Password2
+aes-256-cfb
+sha512
+20000
+16
+Password2
 
 
 ## Usage Examples:
