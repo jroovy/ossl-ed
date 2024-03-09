@@ -331,7 +331,12 @@ oslEnc="Encrypt"
 tarDec="Decrypt & unpack"
 oslDec="Decrypt"
 
-threads="$(nproc)"
+# Set number of threads for compress/decompress
+if [[ -z $THREADS ]]; then
+	threads="$(nproc)"
+else
+	threads="$THREADS"
+fi
 
 # Functions
 
