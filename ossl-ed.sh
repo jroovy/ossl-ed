@@ -943,17 +943,17 @@ if [[ $operation == 'e' ]]; then
 		mkdir -p "${out%/*}"
 	elif [[ -z $useTar ]]; then
 		out+='/'
-		mkdir -p "$out"
 		createDirTree "$@"
 	fi
 else
 	if [[ -z $out ]]; then
 		out='./'
+		createDirTree "$@"
 	else
 		out+='/'
+		createDirTree "$@"
+		mkdir -p "$out"
 	fi
-	mkdir -p "$out"
-	createDirTree "$@"
 fi
 
 # https://stackoverflow.com/questions/67563098/run-command-after-ctrlc-on-watch-command
