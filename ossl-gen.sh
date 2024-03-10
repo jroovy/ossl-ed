@@ -124,7 +124,7 @@ do case "$1" in
 			dynamicPass=1
 			length="$2"
 		fi
-		if [[ length -gt 512 ]]; then
+		if (( length > 512 )); then
 			printf '%s\n' "Warning: OpenSSL can only accept password lengths up to 512"
 			length=512
 		fi
@@ -261,7 +261,7 @@ fi
 if [[ -z $genmode ]]; then
 	genmode='secure'
 fi
-if [[ mode -gt 1 ]]; then
+if (( mode > 1 )); then
 	printNewline=( 'printf' '\n' )
 else
 	printOne=( 'printf' '\n' )
