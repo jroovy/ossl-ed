@@ -255,7 +255,7 @@ if [[ -z $saltVal ]]; then
 	(( mode -- ))
 fi
 if [[ -z $length ]]; then
-	length=40
+	length=64
 	dynamicPass=1
 fi
 if [[ -z $genmode ]]; then
