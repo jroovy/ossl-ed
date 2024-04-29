@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-sslPath='openssl'
+sslPath="$(command -v openssl)"
 tmpDir='/tmp'
-centralPassDir="${HOME}/.config/ossl-ed"
+centralPasswdDir="${HOME}/.config/ossl-ed"
 
-help_msg() {
-printf "
+helpMessage() {
+echo "
 $0 <options> file(s) folder(s) ...
 Options:
   [ -e ] Encrypt file(s)
@@ -17,7 +17,7 @@ Options:
   [ -k privKey,pubKey ] Derive password from an ECDH key pair
   [ -k privKey] Derive a password from your own private key (self encryption)
   [ -f PARAMFILE ] File containing parameters (see -j)
-  [ -F PARAM_NAME ] Read parameter file stored in $centralPassDir (overrides -f)
+  [ -F PARAM_NAME ] Read parameter file stored in $centralPasswdDir (overrides -f)
                     PARAM_NAME should not include file extension
   [ -a ALGO ] Encryption algorithm to use
   [ -s HASH ] Hash algorithm to use
@@ -37,12 +37,11 @@ Options:
              When using -t, FILE should not include extension
   [ -j ] Show usage examples
   [ -h ] Show this help message
-  
 "
 }
 
-example_msg() {
-printf "
+exampleMessage() {
+echo "
 ## Parameter file:
 
 The file should be similar to following format:
@@ -111,7 +110,6 @@ $0 -dp Passw0rd file1 folder2 file3* ...
 $0 -df params.txt file1 folder2 file3* ...
 $0 -dp Passw0rd archive.tar-osl
 $0 -da aes-256-cbc -s sha512 -i 1000 -p Passw0rd file1 folder2 file3* ...
-
 "
 }
 
@@ -121,194 +119,199 @@ OIFS="$IFS"
 ARGS=$(getopt -n openssl-encrypt -o edr:bgp:k:f:F:a:s:i:w:tzc:m:o:jh -- "$@")
 eval set -- "$ARGS"
 
-while :
-do case "$1" in
-	'-e')
-		if [[ -n $operation ]]; then
-			printf "Error: -d cannot be used with -e. Exiting.\n"
-			exit 1
-		fi
-		operation='e'
-		shift
-	;;
-	'-d')
-		if [[ -n $operation ]]; then
-			printf "Error: -e cannot be used with -d. Exiting.\n"
-			exit 1
-		fi
-		operation='d'
-		shift
-	;;
-	'-r')
-		if (( ${#recurVal[@]} == 0 )); then
-			recurVal+=( '-name' "*$2" )
-		else
-			recurVal+=( '-o' '-name' "*$2" )
-		fi
-		shift 2
-	;;
-	'-b')
-		b64='b64-'
-		shift
-	;;
-	'-g')
-		operationType='intmp'
-		randID=$($sslPath rand -hex 8)
-		shift
-	;;
-	'-p')
-		if [[ -n $pass ]]; then
-			printf "'-p' cannot be used with '-k'. Exiting.\n"
-			exit 1
-		fi
-		pass="$2"
-		shift 2
-	;;
-	'-k')
-		if [[ -n $pass ]]; then
-			printf "'-k' cannot be used with '-p'. Exiting.\n"
-			exit 1
-		fi
-
-		# https://unix.stackexchange.com/a/164260
-		IFS=','
-		eccArgs=($2)
-		privKey=${eccArgs[0]}
-		pubKey=${eccArgs[1]}
-
-		if [[ -n $pubKey ]]; then
-			# https://jameshfisher.com/2017/04/14/openssl-ecc/
-			pass=$($sslPath pkeyutl -derive -inkey "$privKey" -peerkey "$pubKey" | $sslPath enc -base64 -A)
-		else
-			# https://stackoverflow.com/a/54926249
-			pass=$(\
-				$sslPath ec -in "$privKey" -pubout 2> /dev/null \
-				| $sslPath pkeyutl -derive -inkey "$privKey" -peerkey /dev/stdin \
-				| $sslPath enc -base64 -A \
-			)
-		fi
-		IFS="$OIFS"
-		unset eccArgs privKey pubKey
-		shift 2
-	;;
-	'-f')
-		passFile="$2"
-		if ! [[ -f "$passFile" ]]; then
-			printf "File '$passFile' not found. Aborting.\n"
-			exit 1
-		fi
-		shift 2
-	;;
-	'-F')
-		if [[ "${2##*.}" == 'txt' ]]; then
-			passFile="${centralPassDir}/${2}"
-		else
-			passFile="${centralPassDir}/${2}.txt"
-		fi
-		if [[ "$2" == *'/'* ]]; then
-			printf '%s\n' "Trying to specify directory to params file." "Use '-f' instead." "Aborting."
-			exit
-		fi
-		if ! [[ -d "$centralPassDir" ]]; then
-			mkdir -p "$centralPassDir"
-		elif ! [[ -f "$passFile" ]]; then
-			printf "Error: '${passFile}' does not exist. Aborting.\n"
-			exit 1
-		fi
-		shift 2
-	;;
-	'-a')
-		algo="$2"
-		shift 2
-	;;
-	'-s')
-		hash="$2"
-		shift 2
-	;;
-	'-i')
-		iter="$2"
-		shift 2
-	;;
-	'-w')
-		salt="$2"
-		shift 2
-	;;
-	'-t')
-		useTar='y'
-		shift
-	;;
-	'-z')
-		tar2own='y'
-		shift
-	;;
-	'-c')
-		cmpType="$2"
-		case "$cmpType" in
-			'bz2' | 'bzip2')
-				cmpExt='bz2'
-				tarExt='tbz2'
-			;;
-			# 'bz3' | 'bzip3')
-			# 	cmpExt='bz3'
-			# 	tarExt='tbz3'
-			# ;;
-			'gz' | 'gzip')
-				cmpExt='gz'
-				tarExt='tgz'
-			;;
-			'lz4')
-				cmpExt='lz4'
-				tarExt='tlz4'
-			;;
-			'lzo' | 'lzop')
-				cmpExt='lzo'
-				tarExt='tlzo'
-			;;
-			'xz')
-				cmpExt='xz'
-				tarExt='txz'
-			;;
-			'zst' | 'zstd')
-				cmpExt='zst'
-				tarExt='tzst'
-			;;
-			*)
-				printf "Unknown compression algorithm '${cmpType}'. Exiting.\n"
+while true; do
+	case "$1" in
+		'-e')
+			if [[ -n $operationType ]]; then
+				echo "Error: -d cannot be used with -e. Exiting."
 				exit 1
-			;;
-		esac
-		shift 2
-	;;
-	'-m')
-		complvl="-${2}"
-		shift 2
-	;;
-	'-o')
-		out="${2}"
-		shift 2
-	;;
-	'-j')
-		example_msg
-		exit
-	;;
-	'-h')
-		help_msg
-		exit
-	;;
-	--)
-		shift
-		break
-	;;
-esac; done
+			fi
+			operationType='e'
+			shift
+		;;
+		'-d')
+			if [[ -n $operationType ]]; then
+				echo "Error: -e cannot be used with -d. Exiting."
+				exit 1
+			fi
+			operationType='d'
+			shift
+		;;
+		'-r')
+			if ! [[ ${2:0:1} == '.' ]]; then
+				ext=".$2"
+			fi
+			if (( ${#matchExtensions[@]} == 0 )); then
+				matchExtensions+=( '-name' "*$ext" )
+			else
+				matchExtensions+=( '-o' '-name' "*$ext" )
+			fi
+			unset ext
+			shift 2
+		;;
+		'-b')
+			b64='b64-'
+			shift
+		;;
+		'-g')
+			processingMode='tmp'
+			randID=$($sslPath rand -hex 8)
+			shift
+		;;
+		'-p')
+			if [[ -n $pass ]]; then
+				echo "'-p' cannot be used with '-k'. Exiting."
+				exit 1
+			fi
+			pass="$2"
+			shift 2
+		;;
+		'-k')
+			if [[ -n $pass ]]; then
+				echo "'-k' cannot be used with '-p'. Exiting."
+				exit 1
+			fi
+
+			# https://unix.stackexchange.com/a/164260
+			IFS=','
+			eccArgs=($2)
+			privKey=${eccArgs[0]}
+			pubKey=${eccArgs[1]}
+
+			if [[ -n $pubKey ]]; then
+				# https://jameshfisher.com/2017/04/14/openssl-ecc/
+				pass=$($sslPath pkeyutl -derive -inkey "$privKey" -peerkey "$pubKey" | $sslPath enc -base64 -A)
+			else
+				# https://stackoverflow.com/a/54926249
+				pass=$(\
+					$sslPath ec -in "$privKey" -pubout 2> /dev/null \
+					| $sslPath pkeyutl -derive -inkey "$privKey" -peerkey /dev/stdin \
+					| $sslPath enc -base64 -A \
+				)
+			fi
+			IFS="$OIFS"
+			unset eccArgs privKey pubKey
+			shift 2
+		;;
+		'-f')
+			paramsFile="$2"
+			if ! [[ -f "$paramsFile" ]]; then
+				echo "File '$paramsFile' not found. Aborting."
+				exit 1
+			fi
+			shift 2
+		;;
+		'-F')
+			if [[ "${2##*.}" == 'txt' ]]; then
+				paramsFile="${centralPasswdDir}/${2}"
+			else
+				paramsFile="${centralPasswdDir}/${2}.txt"
+			fi
+			if [[ "$2" == *'/'* ]]; then
+				echo "Trying to specify directory to params file." "Use '-f' instead." "Aborting."
+				exit
+			fi
+			if ! [[ -d "$centralPasswdDir" ]]; then
+				mkdir -p "$centralPasswdDir"
+			elif ! [[ -f "$paramsFile" ]]; then
+				echo "Error: '${paramsFile}' does not exist. Aborting."
+				exit 1
+			fi
+			shift 2
+		;;
+		'-a')
+			algo="$2"
+			shift 2
+		;;
+		'-s')
+			hash="$2"
+			shift 2
+		;;
+		'-i')
+			iter="$2"
+			shift 2
+		;;
+		'-w')
+			salt="$2"
+			shift 2
+		;;
+		'-t')
+			useTar='y'
+			shift
+		;;
+		'-z')
+			extractTarToSeparateFolder='y'
+			shift
+		;;
+		'-c')
+			compressionType="$2"
+			case "$compressionType" in
+				'bz2' | 'bzip2')
+					compressedExtension='bz2'
+					tarExtension='tbz2'
+				;;
+				# 'bz3' | 'bzip3')
+				# 	compressedExtension='bz3'
+				# 	tarExtension='tbz3'
+				# ;;
+				'gz' | 'gzip')
+					compressedExtension='gz'
+					tarExtension='tgz'
+				;;
+				'lz4')
+					compressedExtension='lz4'
+					tarExtension='tlz4'
+				;;
+				'lzo' | 'lzop')
+					compressedExtension='lzo'
+					tarExtension='tlzo'
+				;;
+				'xz')
+					compressedExtension='xz'
+					tarExtension='txz'
+				;;
+				'zst' | 'zstd')
+					compressedExtension='zst'
+					tarExtension='tzst'
+				;;
+				*)
+					echo "Unknown compression algorithm '${compressionType}'. Exiting."
+					exit 1
+				;;
+			esac
+			shift 2
+		;;
+		'-m')
+			complvl="-${2}"
+			shift 2
+		;;
+		'-o')
+			out="${2}"
+			shift 2
+		;;
+		'-j')
+			exampleMessage
+			exit
+		;;
+		'-h')
+			helpMessage
+			exit
+		;;
+		--)
+			shift
+			break
+		;;
+	esac
+done
 
 if [[ -z $@ ]]; then
-	help_msg
+	helpMessage
 	exit
 fi
 
 # Static parameters when encrypting/decrypting
-staticVals=( 'enc' "-${operation}" '-salt' '-pbkdf2' )
-tmpExt='.osltmp'
+staticFlags=( 'enc' "-${operationType}" '-salt' '-pbkdf2' )
+tempExtension='.osltmp'
 
 # Progress indicator text
 
@@ -325,11 +328,11 @@ work="${cyan}[WORKING]${reset}"
 success="${green}[SUCCESS]${reset}"
 fail="${red}[FAILED]${reset}"
 
-tarCmp="Create & encrypt"
-oslEnc="Encrypt"
+tarCompressMessage="Create & encrypt"
+osslEncryptMessage="Encrypt"
 
-tarDec="Decrypt & unpack"
-oslDec="Decrypt"
+tarUnpackMessage="Decrypt & unpack"
+osslDecryptMessage="Decrypt"
 
 # Set number of threads for compress/decompress
 if [[ -z $THREADS ]]; then
@@ -340,33 +343,33 @@ fi
 
 # Functions
 
-delete-temp-files() {
+deleteTempFiles() {
 	set +o noglob
-	if [[ $operation == 'e' ]]; then
-		if [[ $operationType == 'intmp' ]]; then
-			rm "${tmpDir}/${randID}-"*"${tmpExt}"
+	if [[ $operationType == 'e' ]]; then
+		if [[ $processingMode == 'tmp' ]]; then
+			rm "${tmpDir}/${randID}-"*"${tempExtension}"
 		fi
 		if [[ -z $useTar ]]; then
-			rm "${out}${i1}."*"-osl"
+			rm "${out}${origFileName}."*"-osl"
 		else
 			rm "${out}.t"*"-osl"
 		fi
 	else
-		if [[ $operationType == 'intmp' ]]; then
-			rm "${tmpDir}/${randID}-"*"${tmpExt}"
+		if [[ $processingMode == 'tmp' ]]; then
+			rm "${tmpDir}/${randID}-"*"${tempExtension}"
 		fi
-		if ! [[ "$i2" == 't'*'-osl' ]]; then
-			rm "${out}${i1}"
+		if ! [[ "$fileExtension" == 't'*'-osl' ]]; then
+			rm "${out}${tempFileName}"
 		fi
 	fi
 	exit
 }
 
-gen-ossl-flags() {
-	osslArgs=( ${staticVals[@]} "-${algo}" "-saltlen" "$salt" "-md" "$hash" "-iter" "$iter" "-k" "$pass" )
+setOsslFlags() {
+	osslArgs=( ${staticFlags[@]} "-${algo}" "-saltlen" "$salt" "-md" "$hash" "-iter" "$iter" "-k" "$pass" )
 }
 
-passfile-assign-vars() {
+assignParamsFromFile() {
 	case "${orderArray[orderCount]}" in
 		'1')
 			algo="$i"
@@ -386,193 +389,193 @@ passfile-assign-vars() {
 	esac
 }
 
-passfile-get-params() {
-	case "$paramChoice" in
-		'passfile-ram')
+getParamsFromPasswdFile() {
+	case "$parseMethod" in
+		'loadParamsFileToRam')
 			# https://askubuntu.com/a/705131
-			for i in ${dataArray[@]:${startLine}:${endLine}}; do
-				passfile-assign-vars
+			for i in ${paramsArray[@]:${startLine}:${endLine}}; do
+				assignParamsFromFile
 				(( orderCount ++ ))
 			done
 		;;
-		'passfile-sed')
-			for i in ${dataArray[@]}; do
-				passfile-assign-vars
+		'readParamsFileWithSed')
+			for i in ${paramsArray[@]}; do
+				assignParamsFromFile
 				(( orderCount ++ ))
 			done
 		;;
 	esac
 	unset orderCount
-	gen-ossl-flags
+	setOsslFlags
 }
 
-passfile-ram() {
-	case "$filetype" in
+loadParamsFileToRam() {
+	case "$paramsFileType" in
 		'0')
 			startLine=0
 			endLine=7
 		;;
 		'1')
-			startLine=$n
+			startLine=$parsingPosition
 			endLine=1
 		;;
 		'2')
-			startLine=$(( 2 * n ))
+			startLine=$(( 2 * parsingPosition ))
 			endLine=2
 		;;
 		'3')
-			startLine=$(( 3 * n ))
+			startLine=$(( 3 * parsingPosition ))
 			endLine=3
 		;;
 		'4')
-			startLine=$(( 4 * n ))
+			startLine=$(( 4 * parsingPosition ))
 			endLine=4
 		;;
 		'5')
-			startLine=$(( 5 * n ))
+			startLine=$(( 5 * parsingPosition ))
 			endLine=5
 		;;
 	esac
-	passfile-get-params
+	getParamsFromPasswdFile
 	unset startLine endLine
 }
 
-passfile-sed() {
-	case "$filetype" in
+readParamsFileWithSed() {
+	case "$paramsFileType" in
 		'0')
 			startLine=2
 			endLine=8
 		;;
 		'1')
-			startLine=$(( n + 9 ))
+			startLine=$(( parsingPosition + 9 ))
 			endLine=$startLine
 		;;
 		'2')
-			startLine=$(( (3 * n) + 8 ))
+			startLine=$(( (3 * parsingPosition) + 8 ))
 			endLine=$(( startLine + 1 ))
 		;;
 		'3')
-			startLine=$(( (4 * n) + 7 ))
+			startLine=$(( (4 * parsingPosition) + 7 ))
 			endLine=$(( startLine + 2 ))
 		;;
 		'4')
-			startLine=$(( (5 * n) + 6 ))
+			startLine=$(( (5 * parsingPosition) + 6 ))
 			endLine=$(( startLine + 3 ))
 		;;
 		'5')
-			startLine=$(( (6 * n) + 5 ))
+			startLine=$(( (6 * parsingPosition) + 5 ))
 			endLine=$(( startLine + 4 ))
 		;;
 	esac
-	dataArray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$passFile") )
-	passfile-get-params
-	unset startLine endLine dataArray
+	paramsArray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$paramsFile") )
+	getParamsFromPasswdFile
+	unset startLine endLine paramsArray
 }
 
-osl-encrypt-in-ram() {
-	$paramChoice
+encryptDataInRam() {
+	$parseMethod
 
-	(( n ++ ))
-	(( rcount ++ ))
+	(( parsingPosition ++ ))
+	(( currentIteration ++ ))
 
-	if (( rcount < loop )); then
+	if (( currentIteration < totalIterations )); then
 		$sslPath ${osslArgs[@]} \
-		| osl-encrypt-in-ram
+		| encryptDataInRam
 	else
 		$sslPath ${osslArgs[@]} $base64Flag
 	fi
 }
 
-osl-decrypt-in-ram() {
-	$paramChoice
+decryptDataInRam() {
+	$parseMethod
 
-	(( n -- ))
-	(( rcount ++ ))
+	(( parsingPosition -- ))
+	(( currentIteration ++ ))
 	
-	if (( rcount > 1 )); then
+	if (( currentIteration > 1 )); then
 		unset base64Flag
 	fi
-	if (( rcount < loop )); then
+	if (( currentIteration < totalIterations )); then
 		$sslPath ${osslArgs[@]} $base64Flag \
-		| osl-decrypt-in-ram
+		| decryptDataInRam
 	else
 		$sslPath ${osslArgs[@]} $base64Flag
 	fi
 }
 
-osl-encrypt-in-tmp() {
-	for (( rcount = 0; rcount < loop; n ++ )); do
-		$paramChoice
-		if (( rcount == 0 )); then
+encryptDataInTmp() {
+	for (( currentIteration = 0; currentIteration < totalIterations; parsingPosition ++ )); do
+		$parseMethod
+		if (( currentIteration == 0 )); then
 			$sslPath ${osslArgs[@]} \
-				-out "${tmpDir}/${randID}-$(( rcount + 1 ))${tmpExt}"
-		elif (( rcount != lastOne )); then
+				-out "${tmpDir}/${randID}-$(( currentIteration + 1 ))${tempExtension}"
+		elif (( currentIteration != lastOne )); then
 			$sslPath ${osslArgs[@]} \
-				-in "${tmpDir}/${randID}-${rcount}${tmpExt}" \
-				-out "${tmpDir}/${randID}-$(( rcount + 1 ))${tmpExt}"
-			rm "${tmpDir}/${randID}-${rcount}${tmpExt}"
+				-in "${tmpDir}/${randID}-${currentIteration}${tempExtension}" \
+				-out "${tmpDir}/${randID}-$(( currentIteration + 1 ))${tempExtension}"
+			rm "${tmpDir}/${randID}-${currentIteration}${tempExtension}"
 		else
 			$sslPath ${osslArgs[@]} $base64Flag \
-				-in "${tmpDir}/${randID}-${rcount}${tmpExt}"
-			rm "${tmpDir}/${randID}-${rcount}${tmpExt}"
+				-in "${tmpDir}/${randID}-${currentIteration}${tempExtension}"
+			rm "${tmpDir}/${randID}-${currentIteration}${tempExtension}"
 		fi
-		(( rcount ++ ))
+		(( currentIteration ++ ))
 	done
 }
 
-osl-decrypt-in-tmp() {
-	for (( rcount = 0; rcount < loop; n -- )); do
-		$paramChoice
-		if (( rcount == 0 )); then
+decryptDataInTmp() {
+	for (( currentIteration = 0; currentIteration < totalIterations; parsingPosition -- )); do
+		$parseMethod
+		if (( currentIteration == 0 )); then
 			$sslPath ${osslArgs[@]} $base64Flag \
-				-out "${tmpDir}/${randID}-$(( rcount + 1 ))${tmpExt}" 
-		elif (( rcount != lastOne )); then
+				-out "${tmpDir}/${randID}-$(( currentIteration + 1 ))${tempExtension}" 
+		elif (( currentIteration != lastOne )); then
 			$sslPath ${osslArgs[@]} \
-				-in "${tmpDir}/${randID}-${rcount}${tmpExt}" \
-				-out "${tmpDir}/${randID}-$(( rcount + 1 ))${tmpExt}"
-			rm "${tmpDir}/${randID}-${rcount}${tmpExt}"
+				-in "${tmpDir}/${randID}-${currentIteration}${tempExtension}" \
+				-out "${tmpDir}/${randID}-$(( currentIteration + 1 ))${tempExtension}"
+			rm "${tmpDir}/${randID}-${currentIteration}${tempExtension}"
 		else
 			$sslPath ${osslArgs[@]} \
-				-in "${tmpDir}/${randID}-${rcount}${tmpExt}" 
-			rm "${tmpDir}/${randID}-${rcount}${tmpExt}"
+				-in "${tmpDir}/${randID}-${currentIteration}${tempExtension}" 
+			rm "${tmpDir}/${randID}-${currentIteration}${tempExtension}"
 		fi
-		(( rcount ++ ))
+		(( currentIteration ++ ))
 	done
 }
 
-osl-encrypt() {
-	n=0
-	rcount=0
-	if (( loop < 2 )) || [[ $operationType == 'inram' ]]; then
-		osl-encrypt-in-ram
-	elif [[ $operationType == 'intmp' ]]; then
-		lastOne=$(( loop - 1 ))
-		osl-encrypt-in-tmp
+osslEncrypt() {
+	parsingPosition=0
+	currentIteration=0
+	if (( totalIterations < 2 )) || [[ $processingMode == 'ram' ]]; then
+		encryptDataInRam
+	elif [[ $processingMode == 'tmp' ]]; then
+		lastOne=$(( totalIterations - 1 ))
+		encryptDataInTmp
 	fi
 }
 
-osl-decrypt() {
-	n=$(( loop - 1 ))
-	rcount=0
-	if (( loop < 2 )) || [[ $operationType == 'inram' ]]; then
-		osl-decrypt-in-ram
-	elif [[ $operationType == 'intmp' ]]; then
-		lastOne=$(( loop - 1 ))
-		osl-decrypt-in-tmp
+osslDecrypt() {
+	parsingPosition=$(( totalIterations - 1 ))
+	currentIteration=0
+	if (( totalIterations < 2 )) || [[ $processingMode == 'ram' ]]; then
+		decryptDataInRam
+	elif [[ $processingMode == 'tmp' ]]; then
+		lastOne=$(( totalIterations - 1 ))
+		decryptDataInTmp
 	fi
 }
 
-tar-unpack() {
-	if [[ -z $tar2own ]]; then
+unpackTar() {
+	if [[ -z $extractTarToSeparateFolder ]]; then
 		tar -xf - -C "$out"
 	else
-		mkdir -p "${out}/${i1}"
-		tar -xf - -C "${out}/${i1}"
+		mkdir -p "${out}/${origFileName}"
+		tar -xf - -C "${out}/${origFileName}"
 	fi
 }
 
-data-compress() {
-	case "$cmpType" in
+compressData() {
+	case "$compressionType" in
 		'bz2' | 'bzip2')
 			bzip2 \
 			--quiet \
@@ -635,8 +638,8 @@ data-compress() {
 	esac
 }
 
-data-decompress() {
-	case "$i2" in
+decompressData() {
+	case "$fileExtension" in
 		*'bz2'*)
 			bzip2 \
 			--quiet \
@@ -691,133 +694,133 @@ data-decompress() {
 	esac
 }
 
-encrypt-notar() {
-	case "$cmpType" in
+encryptWithoutTar() {
+	case "$compressionType" in
 		'')
-			printf "$work $oslEnc '$@'"
+			echo -ne "$work $osslEncryptMessage '$1'"
 			if
-				osl-encrypt > "${out}${i}.${b64}enc-osl"
+				osslEncrypt > "${out}${1}.${b64}enc-osl"
 			then
-				printf "${clear}$success $oslEnc '$@'\n"
+				echo -e "${clear}$success $osslEncryptMessage '$1'"
 			else
-				printf "${clear}$fail $oslEnc '$@'\n"
+				echo -e "${clear}$fail $osslEncryptMessage '$1'"
 			fi
 		;;
 		*)
-			printf "$work $oslEnc '$@'"
+			echo -ne "$work $osslEncryptMessage '$1'"
 			if
-				data-compress | osl-encrypt > "${out}${i}.${b64}${cmpExt}-osl"
+				compressData | osslEncrypt > "${out}${1}.${b64}${compressedExtension}-osl"
 			then
-				printf "${clear}$success $oslEnc '$@'\n"
+				echo -e "${clear}$success $osslEncryptMessage '$1'"
 			else
-				printf "${clear}$fail $oslEnc '$@'\n"
+				echo -e "${clear}$fail $osslEncryptMessage '$1'"
 			fi
 		;;
-	esac < "$@"
+	esac < "$1"
 }
 
-encrypt-tar() {
-	if (( ${#recurVal[@]} == 0 )); then
+tarThenEncrypt() {
+	if (( ${#matchExtensions[@]} == 0 )); then
 		tar -cf - "$@"
 	else
 		# https://stackoverflow.com/questions/18731603/how-to-tar-certain-file-types-in-all-subdirectories
-		find "$@" -type f ${recurVal[@]} | tar -cf - -T -
+		find "$@" -type f ${matchExtensions[@]} | tar -cf - -T -
 	fi \
-	| case "$cmpType" in
+	| case "$compressionType" in
 		'')
-			printf "$work $tarCmp '${out}.tar'"
+			echo -ne "$work $tarCompressMessage '${out}.tar'"
 			if
-				osl-encrypt > "${out}.${b64}tar-osl"
+				osslEncrypt > "${out}.${b64}tar-osl"
 			then
-				printf "${clear}$success $tarCmp '${out}.tar'\n"
+				echo -e "${clear}$success $tarCompressMessage '${out}.tar'"
 			else
-				printf "${clear}$fail $tarCmp '${out}.tar' \n"
+				echo -e "${clear}$fail $tarCompressMessage '${out}.tar'"
 			fi
 		;;
 		*)
-			printf "$work $tarCmp '${out}.${tarExt}'"
+			echo -ne "$work $tarCompressMessage '${out}.${tarExtension}'"
 			if
-				data-compress | osl-encrypt > "${out}.${b64}${tarExt}-osl"
+				compressData | osslEncrypt > "${out}.${b64}${tarExtension}-osl"
 			then
-				printf "${clear}$success $tarCmp '${out}.${tarExt}'\n"
+				echo -e "${clear}$success $tarCompressMessage '${out}.${tarExtension}'"
 			else
-				printf "${clear}$fail $tarCmp '${out}.${tarExt}'\n"
+				echo -e "${clear}$fail $tarCompressMessage '${out}.${tarExtension}'"
 			fi
 		;;
 	esac
 }
 
-decrypt-all() {
+decryptInputFiles() {
 	# https://stackoverflow.com/a/965069
-	i1=${@%.*}
-	i2=${@##*.}
-	i3=${i1}.tmp
-	if [[ "$i2" == 'b64-'* ]]; then
+	origFileName=${1%.*}
+	fileExtension=${1##*.}
+	tempFileName=${origFileName}.tmp
+	if [[ "$fileExtension" == 'b64-'* ]]; then
 		base64Flag='-base64'
 	else
 		unset base64Flag
 	fi
-	trap delete-temp-files SIGINT
-	case "$i2" in
+	trap deleteTempFiles SIGINT
+	case "$fileExtension" in
 		*'tar-osl')
-			printf "$work $tarDec '$@'"
+			echo -ne "$work $tarUnpackMessage '$1'"
 			if
-				osl-decrypt | tar-unpack
+				osslDecrypt | unpackTar
 			then
-				printf "${clear}$success $tarDec '$@'\n"
+				echo -e "${clear}$success $tarUnpackMessage '$1'"
 			else
-				printf "${clear}$fail $tarDec '$@'\n"
+				echo -e "${clear}$fail $tarUnpackMessage '$1'"
 			fi
 		;;
 		*'t'*'z'*'-osl')
-			printf "$work $tarDec '$@'"
+			echo -ne "$work $tarUnpackMessage '$1'"
 			if
-				osl-decrypt | data-decompress | tar-unpack
+				osslDecrypt | decompressData | unpackTar
 			then
-				printf "${clear}$success $tarDec '$@'\n"
+				echo -e "${clear}$success $tarUnpackMessage '$1'"
 			else
-				printf "${clear}$fail $tarDec '$@'\n"
+				echo -e "${clear}$fail $tarUnpackMessage '$1'"
 			fi
 		;;
 		*'enc-osl')
-			printf "$work $oslDec '$@'"
+			echo -ne "$work $osslDecryptMessage '$1'"
 			if
-				osl-decrypt > "${out}${i3}"
+				osslDecrypt > "${out}${tempFileName}"
 			then
-				printf "${clear}$success $oslDec '$@'\n"
-				mv "${out}${i3}" "${out}${i1}"
+				echo -e "${clear}$success $osslDecryptMessage '$1'"
+				mv "${out}${tempFileName}" "${out}${origFileName}"
 			else
-				printf "${clear}$fail $oslDec '$@'\n"
-				rm "${out}${i3}"
+				echo -e "${clear}$fail $osslDecryptMessage '$1'"
+				rm "${out}${tempFileName}"
 			fi
 		;;
 		*)
-			printf "$work $oslDec '$@'"
+			echo -ne "$work $osslDecryptMessage '$1'"
 			if
-				osl-decrypt | data-decompress > "${out}${i3}"
+				osslDecrypt | decompressData > "${out}${tempFileName}"
 			then
-				printf "${clear}$success $oslDec '$@'\n"
-				mv "${out}${i3}" "${out}${i1}"
+				echo -e "${clear}$success $osslDecryptMessage '$1'"
+				mv "${out}${tempFileName}" "${out}${origFileName}"
 			else
-				printf "${clear}$fail $oslDec '$@'\n"
-				rm "${out}${i3}"
+				echo -e "${clear}$fail $osslDecryptMessage '$1'"
+				rm "${out}${tempFileName}"
 			fi
 		;;
-	esac < "$@"
+	esac < "$1"
 }
 
 # Check missing variables
 
-if [[ -z $operationType ]]; then
-	operationType='inram'
+if [[ -z $processingMode ]]; then
+	processingMode='ram'
 fi
 
-if [[ -z $passFile ]]; then
+if [[ -z $paramsFile ]]; then
 	if [[ -z $pass ]]; then
-		printf 'Using blank password, are you sure? (y/n) '
+		echo -n 'Using blank password, are you sure? (y/n) '
 		read a
 		if ! [[ "$a" == [yY] ]]; then
-			printf 'Exiting.\n'
+			echo 'Exiting.'
 			exit
 		else
 			unset a
@@ -835,44 +838,44 @@ if [[ -z $passFile ]]; then
 	if [[ -z $salt ]]; then
 		salt='16'
 	fi
-	loop=1
-	gen-ossl-flags
-	unset paramChoice
+	totalIterations=1
+	setOsslFlags
+	unset parseMethod
 else
 	# https://stackoverflow.com/questions/6022384/bash-tool-to-get-nth-line-from-a-file
-	pchk=$(sed '1q;d' "$passFile")
+	paramsFileHeader=$(sed '1q;d' "$paramsFile")
 
-	if ! [[ "$pchk" == '[Cascade Encryption Parameters]' ]]; then
-		printf "Error: first line of file must be '[Cascade Encryption Parameters]'. Aborting.\n"
+	if ! [[ "$paramsFileHeader" == '[Cascade Encryption Parameters]' ]]; then
+		echo "Error: first line of file must be '[Cascade Encryption Parameters]'. Aborting."
 		exit
 	fi
 	
-	filetype=5
-	cval=( $(sed -n "2,8p;8q" "$passFile") )
-	for i in ${cval[@]}; do
+	paramsFileType=5
+	cascadeValue=( $(sed -n "2,8p;8q" "$paramsFile") )
+	for i in ${cascadeValue[@]}; do
 		case "${i:0:1}" in
 			'0')
-				loop="${i:1}"
+				totalIterations="${i:1}"
 			;;
 			'1')
 				algo="${i:1}"
-				(( filetype -- ))
+				(( paramsFileType -- ))
 			;;
 			'2')
 				hash="${i:1}"
-				(( filetype -- ))
+				(( paramsFileType -- ))
 			;;
 			'3')
 				iter="${i:1}"
-				(( filetype -- ))
+				(( paramsFileType -- ))
 			;;
 			'4')
 				salt="${i:1}"
-				(( filetype -- ))
+				(( paramsFileType -- ))
 			;;
 			'5')
 				pass="${i:1}"
-				(( filetype -- ))
+				(( paramsFileType -- ))
 			;;
 			'#')
 				IFS=','
@@ -885,40 +888,40 @@ else
 		esac
 	done
 	
-	if (( loop > 1000 )); then
-		paramChoice='passfile-sed'
+	if (( totalIterations > 1000 )); then
+		parseMethod='readParamsFileWithSed'
 	else
-		case "$filetype" in
+		case "$paramsFileType" in
 			'0')
 				startLine=2
 				endLine=8
 			;;
 			'1')
 				startLine=9
-				endLine=$(( loop + startLine ))
+				endLine=$(( totalIterations + startLine ))
 			;;
 			'2')
 				startLine=8
-				endLine=$(( (loop * 3) + startLine ))
+				endLine=$(( (totalIterations * 3) + startLine ))
 			;;
 			'3')
 				startLine=7
-				endLine=$(( (loop * 4) + startLine ))
+				endLine=$(( (totalIterations * 4) + startLine ))
 			;;
 			'4')
 				startLine=6
-				endLine=$(( (loop * 5) + startLine ))
+				endLine=$(( (totalIterations * 5) + startLine ))
 			;;
 			'5')
 				startLine=5
-				endLine=$(( (loop * 6) + startLine ))
+				endLine=$(( (totalIterations * 6) + startLine ))
 			;;
 		esac
-		paramChoice='passfile-ram'
-		dataArray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$passFile") )
+		parseMethod='loadParamsFileToRam'
+		paramsArray=( $(sed -n "${startLine},${endLine}p;${endLine}q" "$paramsFile") )
 	fi
 	
-	unset i cval pchk
+	unset i cascadeValue paramsFileHeader
 fi
 
 # https://www.baeldung.com/linux/copy-directory-structure
@@ -930,10 +933,10 @@ createDirTree() {
 	done
 }
 
-if [[ $operation == 'e' ]]; then
+if [[ $operationType == 'e' ]]; then
 	if [[ -z $out ]]; then
 		if [[ $useTar == 'y' ]]; then
-			printf '%s\n' "Error: tar archive name not defined. Exiting." "Define name with -o (see -h)"
+			echo -e "Error: tar archive name not defined. Exiting.\nDefine name with -o (see -h)"
 			exit 1
 		else
 			out='./'
@@ -961,7 +964,7 @@ fi
 # https://unix.stackexchange.com/questions/15308/how-to-use-find-command-to-search-for-multiple-extensions
 # https://stackoverflow.com/questions/11456403/stop-shell-wildcard-character-expansion
 
-if [[ $operation == 'e' ]]; then
+if [[ $operationType == 'e' ]]; then
 	set -o noglob
 	if [[ -z $b64 ]]; then
 		unset base64Flag
@@ -970,21 +973,21 @@ if [[ $operation == 'e' ]]; then
 	fi
 	case "$useTar" in
 		'y')
-			trap delete-temp-files SIGINT
-			encrypt-tar "$@"
+			trap deleteTempFiles SIGINT
+			tarThenEncrypt "$@"
 		;;
 		*)
-			find "$@" -type f ! -name '*-osl' ${recurVal[@]} \
+			find "$@" -type f ! -name '*-osl' ${matchExtensions[@]} \
 			| while read -r i; do
-				i1="$i"
-				trap delete-temp-files SIGINT
-				encrypt-notar "$i"
+				origFileName="$i"
+				trap deleteTempFiles SIGINT
+				encryptWithoutTar "$i"
 			done
 		;;
 	esac
-elif [[ $operation == 'd' ]]; then
+elif [[ $operationType == 'd' ]]; then
 	find "$@" -type f -name '*-osl' \
 	| while read -r i; do
-        decrypt-all "$i"
+		decryptInputFiles "$i"
 	done
 fi
