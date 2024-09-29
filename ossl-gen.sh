@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 
+scriptName="${0##*/}"
 sslPath='openssl'
-centralPassDir="${HOME}/.config/ossl-ed"
+centralPassDir="${HOME}/.local/share/ossl-ed"
 
 help_msg() {
 # yellow='\033[0;93m'
 # reset='\033[0m'
 printf "\nUsage:
-$0 <options>
+$scriptName <options>
 
 Options:
   [ -a ALGO ] Encryption algorithm
@@ -30,16 +31,16 @@ Options:
            4 = CHACHA20
         s: 1 = SHA512, 2 = BLAKE2B-512, 3 = SHA3-512,
            4 = WHIRLPOOL
-  [ -o FILE ] Location to save output
-  [ -n NAME ] Save output file to $centralPassDir (overrides -o)
+  [ -o FILE ] Save output to FILE
+  [ -n NAME ] Save output file to ${centralPassDir}/NAME (overrides -o)
               NAME should not include extension
   [ -f ] Generate faster, but less secure passwords
   [ -r ] Use /dev/random instead of /dev/urandom
   [ -h ] Show this help
   
 Example:
-$0 -a aes-256-cbc -s sha512 -i 1000-2000 -c 2 -p 64
-$0 -da123 -ds123 -i s5000 -c 2 -p s64
+$scriptName -a aes-256-cbc -s sha512 -i 1000-2000 -c 2 -p 64
+$scriptName -da123 -ds123 -i s5000 -c 2 -p s64
 \n"
 }
 
@@ -295,9 +296,10 @@ for i in ${staticVals[@]}; do
 		;;
 	esac
 done
+lastDynVal=$(( ${#dynamicVals[@]} - 1 ))
 printf '#'
-for i in ${dynamicVals[@]}; do
-	case "$i" in
+for (( i = 0; i < ${#dynamicVals[@]}; i++ )); do
+	case "${dynamicVals[i]}" in
 		'a')
 			printf '1'
 		;;
@@ -313,8 +315,13 @@ for i in ${dynamicVals[@]}; do
 		'p')
 			printf '5'
 		;;
+		*)
+			continue
+		;;
 	esac
-	printf ','
+	if (( i != lastDynVal )); then
+		printf ','
+	fi
 done
 unset staticVals
 printf '\n%s' "==============================="
