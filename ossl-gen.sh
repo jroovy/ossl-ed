@@ -21,9 +21,6 @@ Options:
   [ -e LO-HI ] Number range of salt length
        Replace LO-HI with a single number for static iteration
   [ -k PRIVKEY,PUBKEY ] Use ECDH shared secret as password
-  [ -t asip ] Choose which parameters are static
-       a: algorithm, s: hash
-       i: iterations, p: password
   [ -d aN|sN ] Randomize encryption algo or hash (overrides -a and -s)
     -da = random algo
     -ds = random hash
@@ -52,7 +49,7 @@ fi
 dynamicVals=( 'a' 'h' 'i' 's' 'p' )
 mode=${#dynamicVals[@]}
 
-ARGS=$(getopt -n openssl-multigen -o a:e:s:i:c:p:k:d:o:n:frh -- "$@")
+ARGS=$(getopt -n openssl-gen -o a:e:s:i:c:p:k:d:o:n:frh -- "$@")
 eval set -- "$ARGS"
 
 while :
@@ -122,7 +119,7 @@ do case "$1" in
 			staticVals+=('p')
 			(( mode -- ))
 		else
-			dynamicPass=1
+			dynamicPasswd=1
 			length="$2"
 		fi
 		if (( length > 512 )); then
@@ -161,8 +158,13 @@ do case "$1" in
 						exit
 					;;
 				esac
-				algoLength=${#algo[@]}
 			done
+			algoLength=${#algo[@]}
+			if [[ algoLength -eq 1 && $algo == chacha20 ]]; then
+				dynamicVals=( "${dynamicVals[@]/a}" )
+				staticVals+=('a')
+				(( mode -- ))
+			fi
 		elif [[ "${2:0:1}" == 's' ]]; then
 			for (( i = 1; i < ${#2}; i ++ )); do
 				case "${2:${i}:1}" in
@@ -183,8 +185,13 @@ do case "$1" in
 						exit
 					;;
 				esac
-				hashLength=${#hash[@]}
 			done
+			hashLength=${#hash[@]}
+			if (( hashLength == 1 )); then
+				dynamicVals=( "${dynamicVals[@]/h}" )
+				staticVals+=('h')
+				(( mode -- ))
+			fi
 		fi
 		shift 2
 	;;
@@ -257,7 +264,7 @@ if [[ -z $saltVal ]]; then
 fi
 if [[ -z $length ]]; then
 	length=64
-	dynamicPass=1
+	dynamicPasswd=1
 fi
 if [[ -z $genmode ]]; then
 	genmode='secure'
@@ -296,44 +303,46 @@ for i in ${staticVals[@]}; do
 		;;
 	esac
 done
-lastDynVal=$(( ${#dynamicVals[@]} - 1 ))
-printf '#'
-for (( i = 0; i < ${#dynamicVals[@]}; i++ )); do
-	case "${dynamicVals[i]}" in
-		'a')
-			printf '1'
-		;;
-		'h')
-			printf '2'
-		;;
-		'i')
-			printf '3'
-		;;
-		's')
-			printf '4'
-		;;
-		'p')
-			printf '5'
-		;;
-		*)
-			continue
-		;;
-	esac
-	if (( i != lastDynVal )); then
-		printf ','
-	fi
-done
-unset staticVals
-printf '\n%s' "==============================="
+if (( ${#staticVals[@]} < 5 )); then
+	dynamicVals=(${dynamicVals[@]})
+	lastDynVal=$(( ${#dynamicVals[@]} - 1 ))
+	printf '#'
+	for (( i = 0; i < ${#dynamicVals[@]}; i++ )); do
+		case "${dynamicVals[i]}" in
+			'a')
+				printf '1'
+			;;
+			'h')
+				printf '2'
+			;;
+			'i')
+				printf '3'
+			;;
+			's')
+				printf '4'
+			;;
+			'p')
+				printf '5'
+			;;
+			*)
+				continue
+			;;
+		esac
+		if (( i != lastDynVal )); then
+			printf ','
+		else
+			printf '\n'
+		fi
+	done
+fi
+printf '%s' "==============================="
 }
 
 generate-file() {
-
 gen-static
-
 if [[ $genmode == 'secure' ]]; then
 	for (( i = 0; i < rounds; i ++ )); do
-		if (( dynamicPass == 1 )); then
+		if (( dynamicPasswd == 1 )); then
 			pass=$(cat $randomType | tr -dc '[:graph:]' | head -c $length)
 		fi
 		if (( dynamicIteration == 1 )); then
@@ -389,7 +398,7 @@ elif [[ $genmode == 'fast' ]]; then
 		if (( dynamicSalt == 1 )); then
 			salt=( $(shuf -r -n $subRuns -i $saltVal) )
 		fi
-		if (( dynamicPass == 1 )); then
+		if (( dynamicPasswd == 1 )); then
 			pass=( $(cat $randomType | tr -dc '[:graph:]' | head -c $(( length * subRuns )) | fold -w $length) )
 		fi
 		for (( i = 0; i < subRuns; i ++ )); do
@@ -417,7 +426,6 @@ elif [[ $genmode == 'fast' ]]; then
 	done
 fi
 ${printOne[@]}
-
 }
 
 if [[ -z $output ]]; then

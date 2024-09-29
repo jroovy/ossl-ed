@@ -548,7 +548,7 @@ decryptDataInTmp() {
 osslEncrypt() {
 	parsingPosition=0
 	currentIteration=0
-	if (( totalIterations < 2 )) || [[ $processingMode == 'ram' ]]; then
+	if [[ totalIterations -lt 2 || $processingMode == 'ram' ]]; then
 		encryptDataInRam
 	elif [[ $processingMode == 'tmp' ]]; then
 		lastOne=$(( totalIterations - 1 ))
@@ -559,7 +559,7 @@ osslEncrypt() {
 osslDecrypt() {
 	parsingPosition=$(( totalIterations - 1 ))
 	currentIteration=0
-	if (( totalIterations < 2 )) || [[ $processingMode == 'ram' ]]; then
+	if [[ totalIterations -lt 2 || $processingMode == 'ram' ]]; then
 		decryptDataInRam
 	elif [[ $processingMode == 'tmp' ]]; then
 		lastOne=$(( totalIterations - 1 ))
