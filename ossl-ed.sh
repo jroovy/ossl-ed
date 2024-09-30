@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-scriptName="${0##/*}"
+scriptName="${0##*/}"
 sslPath="$(command -v openssl)"
 tmpDir='/tmp'
-centralPasswdDir="${HOME}/.local/share/ossl-ed"
+centralPasswdDir="${HOME}/.local/share/${scriptName}"
 
 helpMessage() {
 echo "
